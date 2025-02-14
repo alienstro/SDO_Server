@@ -4,25 +4,61 @@ import sql from 'mssql';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 const router = Router();
-// GET METHOD: Fetch Users
-router.get('/users', async (req, res) => {
+// GET METHOD: Fetch loanDetails for Accounting and OSDS
+router.get('/loanApplication/loanDetails', async (req, res) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
-            SELECT TOP (100) 
-            [applicant_id], [first_name], [middle_name], [last_name], [ext_name], [email], [institution_name], [position_id], [emp_status], [designation], [password] 
-            FROM [sdo_accounting].[dbo].[tbl_Applicant]
+            SELECT 
+            ld.loan_details_id,
+            ld.loan_amount,
+            ld.type_of_loan,
+            ld.term,
+            ld.loan_application_number,
+            ld.purpose,
+            ld.borrowers_agreement,
+            ld.co_makers_agreement,
+            ld.applicant_id,
+            ld.application_id,
+            ld.date_submitted,
+            a.last_name,
+            a.first_name,
+            a.middle_name,
+            la.is_approved_osds
+            FROM tbl_Loan_Application la
+            JOIN tbl_Loan_Details ld
+            ON la.application_id = ld.application_id
+            JOIN tbl_Applicant a
+            ON la.applicant_id = a.applicant_id;
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
         }
         else {
-            res.status(404).json({ message: 'No users found' });
+            res.status(404).json({ message: 'No Loan Details found' });
         }
     }
     catch (error) {
         console.error('Failed to retrieve users:', error);
         res.status(500).json({ message: 'Failed to retrieve users', error });
+    }
+});
+// GET METHOD: Fetch loanDetails
+router.get('/loanApplication/getDepartmentStatus/:departmentId', async (req, res) => {
+    try {
+        const { departmentId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('departmentId', sql.Int, departmentId)
+            .query(`
+                SELECT * FROM tbl_department_status
+                WHERE department_id = @departmentId;
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error('Failed to get department status:', error);
+        res.status(500).json({ message: 'Failed to retrieve department status: ', error });
     }
 });
 // GET METHOD: Fetch User by Email

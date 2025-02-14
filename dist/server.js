@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectToDatabase } from './database/dbconnection.js';
 import userRoutes from './routes/userRoutes.js';
+import loanApplicationRoutes from './routes/loanApplicationRoutes.js';
 dotenv.config();
 const app = express();
 const port = process.env.DB_PORT || 3000;
@@ -35,6 +36,7 @@ connectToDatabase()
 });
 // Routes
 app.use('/api', userRoutes);
+app.use('/api', loanApplicationRoutes);
 // Root route
 app.get('/', (req, res) => {
     res.send('Welcome to the API!');

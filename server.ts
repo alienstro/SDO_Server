@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectToDatabase } from './database/dbconnection.js';
 import userRoutes from './routes/userRoutes.js';
+import loanApplicationRoutes from './routes/loanApplicationRoutes.js';
 
 
 dotenv.config();
@@ -46,6 +47,7 @@ connectToDatabase()
 
 // Routes
 app.use('/api', userRoutes);
+app.use('/api', loanApplicationRoutes);
 
 // Root route
 app.get('/', (req, res) => {

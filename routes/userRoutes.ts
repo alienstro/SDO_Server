@@ -1,17 +1,21 @@
 import express, { Router, Request, Response } from 'express';
 import { connectToDatabase } from '../database/dbconnection.js';
 import sql from 'mssql';
-import argon2 from 'argon2';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
-// GET METHOD
+// GET METHOD: Fetch Users
 router.get('/users', async (req: Request, res: Response): Promise<any> => {
     try {
         const pool = await connectToDatabase();
-        const result = await pool.request().query('SELECT * FROM tbl_Applicant');
+        const result = await pool.request().query(`
+            SELECT TOP (100) 
+            [applicant_id], [first_name], [middle_name], [last_name], [ext_name], [email], [institution_name], [position_id], [emp_status], [designation], [password] 
+            FROM [sdo_accounting].[dbo].[tbl_Applicant]
+        `);
 
-        // Check if there is data in table
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
         } else {
@@ -23,204 +27,185 @@ router.get('/users', async (req: Request, res: Response): Promise<any> => {
     }
 });
 
-router.get('/institutions', async (req: Request, res: Response): Promise<any> => {
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
+// GET METHOD: Fetch User by Email
+router.get('/users/email/:email/:table/:id_type', async (req: Request, res: Response): Promise<any> => {
+    const { email, table, id_type } = req.params;
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('email', sql.VarChar, email)
+            .query(`
+                SELECT password, ${id_type} FROM ${table}
+                WHERE email = @email;
+            `);
 
-    // try {
-    //     const pool = await connectToDatabase();
-    //     const result = await pool.request().query('SELECT * FROM tblInstitutions');
-
-    //     // Check if there is data in table
-    //     if (result.recordset.length > 0) {
-    //         res.status(200).json(result.recordset);
-    //     } else {
-    //         res.status(404).json({ message: 'No institutions found' });
-    //     }
-    // } catch (error) {
-    //     console.error('Failed to retrieve users:', error);
-    //     res.status(500).json({ message: 'Failed to retrieve users', error });
-    // }
+        const user = result.recordset[0];
+        if (user) {
+            res.status(200).json(user);
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Failed to retrieve user:', error);
+        res.status(500).json({ message: 'Failed to retrieve user', error });
+    }
 });
 
-router.get('/positions', async (req: Request, res: Response): Promise<any> => {
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
+// GET METHOD: Fetch User Profile
+router.get('/users/profile/:role/:id', async (req: Request, res: Response): Promise<any> => {
+    const { role, id } = req.params;
 
-    // try {
-    //     const pool = await connectToDatabase();
-    //     const result = await pool.request().query('SELECT * FROM tblPositions');
+    try {
+        const pool = await connectToDatabase();
+        let query = '';
 
-    //     // Check if there is data in table
-    //     if (result.recordset.length > 0) {
-    //         res.status(200).json(result.recordset);
-    //     } else {
-    //         res.status(404).json({ message: 'No positions found' });
-    //     }
-    // } catch (error) {
-    //     console.error('Failed to retrieve users:', error);
-    //     res.status(500).json({ message: 'Failed to retrieve users', error });
-    // }
+        if (role === 'applicant') {
+            query = `
+                SELECT
+                app.applicant_id,
+                app.email, 
+                app.first_name, 
+                app.middle_name, 
+                app.last_name, 
+                app.ext_name,
+                app.designation
+                FROM tbl_Applicant app
+                WHERE app.applicant_id = @id;
+            `;
+        } else {
+            query = `
+                SELECT
+                sta.staff_id,
+                sta.email, 
+                sta.first_name, 
+                sta.middle_name, 
+                sta.last_name, 
+                sta.ext_name,
+                dept.department_name
+                FROM tbl_Staff sta
+                JOIN tbl_Department dept
+                ON sta.department_id = dept.department_id
+                WHERE sta.staff_id = @id;
+            `;
+        }
+
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query(query);
+
+        const profile = result.recordset[0];
+        if (profile) {
+            res.status(200).json(profile);
+        } else {
+            res.status(404).json({ message: 'Profile not found' });
+        }
+    } catch (error) {
+        console.error('Failed to retrieve profile:', error);
+        res.status(500).json({ message: 'Failed to retrieve profile', error });
+    }
 });
 
+// POST METHOD: User Login
+router.post('/login', async (req: Request, res: Response): Promise<any> => {
+    const { email, password } = req.body;
 
-// POST METHOD
-router.post('/users', async (req: express.Request, res: express.Response): Promise<any> => {
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+    }
 
-    // const { userId, Institution, Name, Email, Position, Password, Status } = req.body;
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('email', sql.VarChar, email)
+            .query(`
+                SELECT staff_id, first_name, last_name, email, password, department_id 
+                FROM tbl_Staff 
+                WHERE email = @email;
+            `);
 
-    // if (!userId || !Institution || !Name || !Email || !Position || !Password || !Status) {
-    //     return res.status(400).json({ message: 'All fields are required' });
-    // }
+        const user = result.recordset[0];
 
-    // try {
-    //     // Hash the password
-    //     const hashedPassword = await argon2.hash(Password);
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
 
-    //     const pool = await connectToDatabase();
-    //     const result = await pool.request()
-    //         .input('Institution', sql.VarChar, Institution)
-    //         .input('Name', sql.VarChar, Name)
-    //         .input('Email', sql.VarChar, Email)
-    //         .input('Position', sql.VarChar, Position)
-    //         .input('Password', sql.VarChar, hashedPassword) // Store hashed password
-    //         .input('Status', sql.VarChar, Status)
-    //         .query(`
-    //         INSERT INTO tblUserAccounts (institution, name, email, position, password, status)
-    //         OUTPUT INSERTED.*
-    //         VALUES (@Institution, @Name, @Email, @Position, @Password, @Status)
-    //         `);
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid password' });
+        }
 
-    //     const newUser = result.recordset[0];
+        // Generate JWT token
+        const token = generateJWT(user.staff_id, user.first_name, user.last_name, user.email, user.department_id);
 
-    //     res.status(201).json({ message: 'User created successfully', user: newUser });
-    // } catch (error) {
-    //     console.error('Failed to create user:', error);
-    //     res.status(500).json({ message: 'Failed to create user', error });
-    // }
+        res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            token,
+            role: user.department_id
+        });
+
+    } catch (error) {
+        console.error('Failed to login user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred',
+            error
+        });
+    }
 });
 
-// BULK USER CREATION
-router.post('/users/bulk-create', async (req: express.Request, res: express.Response): Promise<any> => {
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
+const generateJWT = (staff_id: number, first_name: string, last_name: string, email: string, role: string) => {
+    const JWT_SECRET = process.env.SECRET_KEY || 'tokentest'
 
-    // const { users } = req.body;
+    const payload = {
+        iss: "localhost",
+        aud: "localhost",
+        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
+        data: {
+            staff_id,
+            first_name,
+            last_name,
+            email,
+            role
+        },
+    };
 
-    // if (!users || !Array.isArray(users) || users.length === 0) {
-    //     return res.status(400).json({ message: 'Invalid or empty users list' });
-    // }
+    return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
+};
 
-    // try {
-    //     const pool = await connectToDatabase();
-    //     const createdUsers: { userId: number; institution: string; name: string; email: string; position: string;  password: string; status: string }[] = [];
+// POST METHOD: Add User
+router.post('/users', async (req: Request, res: Response): Promise<any> => {
+    const { first_name, middle_name, last_name, ext_name, email, institution_name, position_id, emp_status, designation, password } = req.body;
 
-    //     const bulkInsertQuery = users.map(async (user) => {
-    //         const hashedPassword = await argon2.hash(user.Password);
+    if (!first_name || !last_name || !email || !institution_name || !position_id || !emp_status || !designation || !password) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
 
-    //         const result = await pool.request()
-    //             .input('Institution', sql.VarChar, user.Institution)
-    //             .input('Name', sql.VarChar, user.Name)
-    //             .input('Email', sql.VarChar, user.Email)
-    //             .input('Position', sql.VarChar, user.Position)
-    //             .input('Password', sql.VarChar, hashedPassword)
-    //             .input('Status', sql.VarChar, user.Status)
-    //             .query(`
-    //                 INSERT INTO tblUserAccounts (institution, name, email, position, password, status)
-    //                 OUTPUT INSERTED.userId, INSERTED.institution, INSERTED.name, INSERTED.email, INSERTED.position, INSERTED.password, INSERTED.status
-    //                 VALUES (@Institution, @Name, @Email, @Position, @Password, @Status)
-    //             `);
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('first_name', sql.VarChar, first_name)
+            .input('middle_name', sql.VarChar, middle_name)
+            .input('last_name', sql.VarChar, last_name)
+            .input('ext_name', sql.VarChar, ext_name)
+            .input('email', sql.VarChar, email)
+            .input('institution_name', sql.VarChar, institution_name)
+            .input('position_id', sql.Int, position_id)
+            .input('emp_status', sql.VarChar, emp_status)
+            .input('designation', sql.VarChar, designation)
+            .input('password', sql.VarChar, password)
+            .query(`
+                INSERT INTO [sdo_accounting].[dbo].[tbl_Applicant] 
+                ([first_name], [middle_name], [last_name], [ext_name], [email], [institution_name], [position_id], [emp_status], [designation], [password])
+                VALUES (@first_name, @middle_name, @last_name, @ext_name, @email, @institution_name, @position_id, @emp_status, @designation, @password)
+            `);
 
-    //         // Push newly created user details to array
-    //         if (result.recordset.length > 0) {
-    //             createdUsers.push(result.recordset[0]);
-    //         }
-    //     });
-
-    //     await Promise.all(bulkInsertQuery);
-
-    //     res.status(201).json({ message: 'Bulk users created successfully', users: createdUsers });
-    // } catch (error) {
-    //     console.error('Bulk user creation error:', error);
-    //     res.status(500).json({ message: 'Failed to create users', error });
-    // }
-});
-
-router.put('/users/:id', async (req: Request, res: Response): Promise<any> => {
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    // EXAMPLE EXAMPLE EXAPLE EXAMPLE EXAMPLE EXAMPLE ONLY 
-    
-    // const { id } = req.params;
-    // const { institution, name, email, position, password, status } = req.body;
-
-    // if (!institution || !name || !email || !position || !status) {
-    //     return res.status(400).json({ message: 'All fields are required except password' });
-    // }
-
-    // try {
-    //     const pool = await connectToDatabase();
-
-    //     if (password) {
-    //         console.log("with password");
-
-    //         // Hash the password if provided
-    //         const hashedPassword = await argon2.hash(password);
-
-    //         const result = await pool.request()
-    //             .input('Institution', sql.VarChar, institution)
-    //             .input('Name', sql.VarChar, name)
-    //             .input('Email', sql.VarChar, email)
-    //             .input('Position', sql.VarChar, position)
-    //             .input('Password', sql.VarChar, hashedPassword)
-    //             .input('Status', sql.VarChar, status)
-    //             .input('userId', sql.Int, id)
-    //             .query(`
-    //             UPDATE tblUserAccounts
-    //             SET institution = @Institution, name = @Name, email = @Email, position = @Position, password = @Password, status = @Status
-    //             OUTPUT INSERTED.*
-    //             WHERE userId = @userId
-    //             `);
-
-    //         const updatedUser = result.recordset[0];
-    //         res.status(200).json({ message: `User updated successfully`, user: updatedUser });
-    //     } else {
-    //         console.log("without password");
-
-    //         // If no password is provided, update other fields only
-    //         const result = await pool.request()
-    //             .input('Institution', sql.VarChar, institution)
-    //             .input('Name', sql.VarChar, name)
-    //             .input('Email', sql.VarChar, email)
-    //             .input('Position', sql.VarChar, position)
-    //             .input('Status', sql.VarChar, status)
-    //             .input('userId', sql.Int, id)
-    //             .query(`
-    //             UPDATE tblUserAccounts
-    //             SET institution = @Institution, name = @Name, email = @Email, position = @Position, status = @Status
-    //             OUTPUT INSERTED.*
-    //             WHERE userId = @userId
-    //             `);
-
-    //         const updatedUser = result.recordset[0];
-    //         res.status(200).json({ message: `User updated successfully`, user: updatedUser });
-    //     }
-    // } catch (error) {
-    //     console.error('Error updating user:', error);
-    //     res.status(500).json({ message: 'Failed to update user', error });
-    // }
-});
-
-
-router.delete('/users/:id', (req: Request, res: Response) => {
-    const { id } = req.params;
-    res.send(`Delete user with ID ${id}`);
+        res.status(201).json({ message: 'User added successfully', user: req.body });
+    } catch (error) {
+        console.error('Failed to add user:', error);
+        res.status(500).json({ message: 'Failed to add user', error });
+    }
 });
 
 export default router;
