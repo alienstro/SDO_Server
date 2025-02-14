@@ -43,7 +43,7 @@ router.get('/loanApplication/loanDetails', async (req, res) => {
         res.status(500).json({ message: 'Failed to retrieve users', error });
     }
 });
-// GET METHOD: Fetch loanDetails
+// GET METHOD: Fetch departmentStatus by departmentId
 router.get('/loanApplication/getDepartmentStatus/:departmentId', async (req, res) => {
     try {
         const { departmentId } = req.params;
@@ -59,6 +59,87 @@ router.get('/loanApplication/getDepartmentStatus/:departmentId', async (req, res
     catch (error) {
         console.error('Failed to get department status:', error);
         res.status(500).json({ message: 'Failed to retrieve department status: ', error });
+    }
+});
+// GET METHOD: Fetch borrowersInformation by applicationId
+router.get('/loanApplication/borrowersInformationById/:applicationId', async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                SELECT * FROM [tbl_Borrowers_Information]
+                WHERE application_id = @application_id
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error('Failed to get Co Makers Information:', error);
+        res.status(500).json({ message: 'Failed to retrieve Co Makers Informatio: ', error });
+    }
+});
+// GET METHOD: Fetch coMakersInformationById by applicationId
+router.get('/loanApplication/coMakersInformationById/:applicationId', async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                SELECT * FROM [tbl_Co_Makers_Information]
+                WHERE application_id = @application_id
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error('Failed to get Co Makers Information:', error);
+        res.status(500).json({ message: 'Failed to retrieve Co Makers Information: ', error });
+    }
+});
+// GET METHOD: Fetch assessmentDetailsById by applicationId
+router.get('/loanApplication/getAssessmentDetailsById/:applicationId', async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                SELECT * FROM [sdo_accounting].[dbo].[tbl_Assessment_Form] WHERE application_id = @application_id
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error('Failed to get assessment form:', error);
+        res.status(500).json({ message: 'Failed to retrieve assessment form: ', error });
+    }
+});
+// GET METHOD: Fetch getApplicant by applicantId
+router.get('/loanApplication/getApplicant/:applicantId', async (req, res) => {
+    try {
+        const { applicantId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('applicantId', sql.Int, applicantId)
+            .query(`
+                SELECT  [applicant_id],
+                        [first_name],
+                        [middle_name],
+                        [last_name],
+                        [ext_name],
+                        [email],
+                        [institution_name],
+                        [position_id],
+                        [emp_status],
+                        [designation]
+                FROM [tbl_Applicant]
+                WHERE applicant_id = @applicantId
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error('Failed to get assessment form:', error);
+        res.status(500).json({ message: 'Failed to retrieve assessment form: ', error });
     }
 });
 // GET METHOD: Fetch User by Email
@@ -224,6 +305,88 @@ router.post('/users', async (req, res) => {
     catch (error) {
         console.error('Failed to add user:', error);
         res.status(500).json({ message: 'Failed to add user', error });
+    }
+});
+// PATCH METHOD: Update Approval OSDS
+router.patch('/loanApplication/updateApprovalOSDS', async (req, res) => {
+    try {
+        const { application_id } = req.body;
+        const office = 'OSDS';
+        if (!application_id) {
+            return res.status(400).json({ success: false, message: 'Application ID is required' });
+        }
+        const pool = await connectToDatabase();
+        // Begin transaction
+        const transaction = pool.transaction();
+        await transaction.begin();
+        // Update loan status
+        const updateStatusResult = await transaction.request()
+            .input('status', sql.VarChar, 'Approved')
+            .input('office', sql.VarChar, office)
+            .input('application_id', sql.Int, application_id)
+            .query(`
+                UPDATE tbl_department_status
+                SET status = @status,
+                    updated_at = CURRENT_TIMESTAMP 
+                FROM tbl_department_status AS tas
+                INNER JOIN tbl_department AS toff
+                ON tas.department_id = toff.department_id
+                WHERE toff.department_name = @office AND tas.application_id = @application_id;
+            `);
+        if (updateStatusResult.rowsAffected[0] === 0) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'No matching record found' });
+        }
+        // Insert into loan status history
+        let remarkMsg = '';
+        switch (office.toLowerCase()) {
+            case 'applicant':
+                remarkMsg = 'Submitted to OSDS';
+                break;
+            case 'osds':
+                remarkMsg = 'Forwarded to Accounting';
+                break;
+            case 'accounting':
+                remarkMsg = 'For Assessment';
+                break;
+            case 'secretariat':
+            case 'hr':
+            case 'admin':
+                remarkMsg = 'For Signature';
+                break;
+            case 'legal':
+            case 'asds':
+                remarkMsg = 'For Endorsement';
+                break;
+            case 'sds':
+                remarkMsg = 'For Payment Process';
+                break;
+            case 'payment':
+                remarkMsg = 'Payment Confirm';
+                break;
+            default:
+                remarkMsg = 'Status Updated';
+                break;
+        }
+        const insertHistoryResult = await transaction.request()
+            .input('application_id', sql.Int, application_id)
+            .input('remarks', sql.VarChar, remarkMsg)
+            .input('initiator', sql.VarChar, office)
+            .query(`
+                INSERT INTO tbl_application_status_history (application_id, remarks, history_date, initiator)
+                VALUES (@application_id, @remarks, CURRENT_TIMESTAMP, @initiator);
+            `);
+        if (insertHistoryResult.rowsAffected[0] === 0) {
+            await transaction.rollback();
+            return res.status(500).json({ success: false, message: 'Failed to insert status history' });
+        }
+        // Commit transaction
+        await transaction.commit();
+        res.status(200).json({ success: true, message: 'Loan status updated successfully!' });
+    }
+    catch (error) {
+        console.error('Failed to update loan status:', error);
+        res.status(500).json({ message: 'Failed to update approval OSDS', error });
     }
 });
 export default router;
