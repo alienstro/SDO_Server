@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 const router = Router();
 // GET METHOD: Fetch Users
-router.get('/users', async (req, res) => {
+router.get('/applicantUser', async (req, res) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
@@ -101,8 +101,8 @@ router.get('/users/profile/:role/:id', async (req, res) => {
         res.status(500).json({ message: 'Failed to retrieve profile', error });
     }
 });
-// POST METHOD: User Login
-router.post('/login', async (req, res) => {
+// POST METHOD: Applicant Login
+router.post('/staffLogin', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
         return res.status(400).json({ message: 'Email and password are required' });
@@ -155,6 +155,66 @@ const generateJWT = (staff_id, first_name, last_name, email, role) => {
             last_name,
             email,
             role
+        },
+    };
+    return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
+};
+// POST METHOD: Applicant Login
+router.post('/applicantLogin', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+    }
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('email', sql.VarChar, email)
+            .query(`
+                SELECT *
+                FROM tbl_Applicant 
+                WHERE email = @email;
+            `);
+        const user = result.recordset[0];
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid password' });
+        }
+        // Generate JWT token
+        const token = generateJWTApplicant(user.applicant_id, user.first_name, user.middle_name, user.last_name, user.ext_name, user.email, user.designation);
+        res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            token,
+            role: user.department_id
+        });
+    }
+    catch (error) {
+        console.error('Failed to login user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred',
+            error
+        });
+    }
+});
+const generateJWTApplicant = (applicant_id, first_name, middle_name, last_name, ext_name, email, designation) => {
+    const JWT_SECRET = process.env.SECRET_KEY || 'tokentest';
+    const payload = {
+        iss: "localhost",
+        aud: "localhost",
+        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
+        data: {
+            applicant_id,
+            first_name,
+            middle_name,
+            last_name,
+            ext_name,
+            email,
+            designation
         },
     };
     return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
