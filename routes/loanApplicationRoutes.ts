@@ -45,6 +45,28 @@ router.get('/loanApplication/loanDetails', async (req: Request, res: Response): 
     }
 });
 
+// GET METHOD: Fetch loanApplicationStatus by applicantId
+router.get('/loanApplication/LoanApplicationStatus/:applicantId', async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { applicantId } = req.params;
+
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input('applicant_id', sql.Int, applicantId)
+            .query(`
+                    SELECT * FROM tbl_Loan_Application LA
+                    JOIN tbl_department_status OS
+                    ON LA.application_id = OS.application_id
+                    WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id;
+            `);
+
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        console.error('Failed to get loan application status:', error);
+        res.status(500).json({ message: 'Failed to retrieve loan application status: ', error });
+    }
+});
+
 // GET METHOD: Fetch departmentStatus by departmentId
 router.get('/loanApplication/getDepartmentStatus/:departmentId', async (req: Request, res: Response): Promise<any> => {
     try {
@@ -346,7 +368,7 @@ router.patch('/loanApplication/updateApprovalOSDS', async (req: Request, res: Re
         if (!application_id) {
             return res.status(400).json({ success: false, message: 'Application ID is required' });
         }
-    
+
 
         const pool = await connectToDatabase();
 
