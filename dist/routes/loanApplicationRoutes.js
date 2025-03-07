@@ -431,13 +431,12 @@ let filePaths = {};
 function getFilePath(key) {
     return filePaths[key] || null;
 }
-// Function to mimic the PHP saveFile() method
 async function fileServiceSaveFile(application_id, applicant_id, files) {
     try {
         // TODO: add validation only pdf file is allowed
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        const fileUploadLocation = path.join(__dirname, '/../../applicant/');
+        const fileUploadLocation = path.join(__dirname, '/../uploads/applicant/');
         const outputFolder = path.join(fileUploadLocation, String(applicant_id));
         const filePathDir = path.join(outputFolder, 'documents', String(application_id));
         if (!fs.existsSync(filePathDir)) {
@@ -445,7 +444,7 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
         }
         // This line from PHP: 'http://localhost/sdo_api_v1/applicant/1/documents/1010/authorityToDeduct.pdf';
         // Lol fix this
-        const absFilePath = `/sdo_api_v1/applicant/${applicant_id}/documents/${application_id}/`;
+        const absFilePath = `/uploads/applicant/${applicant_id}/documents/${application_id}/`;
         // Loop through each file in req.files
         for (const key in files) {
             if (Object.prototype.hasOwnProperty.call(files, key)) {
@@ -481,7 +480,6 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
         throw error;
     }
 }
-// Function to mimic updateLoanStatusHistory() in PHP
 async function updateLoanStatusHistory(initiator, application_id, transaction) {
     try {
         let remarkMsg = '';
@@ -534,6 +532,7 @@ async function updateLoanStatusHistory(initiator, application_id, transaction) {
 import multer from 'multer';
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+// POST METHOD: Add Loan Application
 router.post('/addLoanData', upload.fields([
     { name: 'csc' },
     { name: 'emergency' },
@@ -543,18 +542,14 @@ router.post('/addLoanData', upload.fields([
     { name: 'payslipApplicant' },
     { name: 'payslipComaker' }
 ]), async (req, res) => {
-    const { loanDetails, borrowerInfo, comakerInfo, applicant_id } = req.body;
-    // console.log(req.body.loanDetails[0]);
-    // console.log(req.files);
-    // console.log(data);
-    // if (!loanDetails[0] || !borrowerInfo[0] || !comakerInfo[0] || !applicant_id) {
-    //     return res.status(400).json({ message: 'Missing required fields' });
-    // }
+    const { loanDetails, borrowerInfo, comakerInfo } = req.body;
+    const applicant_id = Number(req.body.applicantId);
     try {
         const pool = await connectToDatabase();
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {
+            console.log(applicant_id);
             // tbl_Loan_Application
             const request1 = new sql.Request(transaction);
             request1.input('applicant_id', sql.Int, applicant_id);
