@@ -542,6 +542,7 @@ router.post('/addLoanData', upload.fields([
     { name: 'payslipApplicant' },
     { name: 'payslipComaker' }
 ]), async (req, res) => {
+    // const { loanDetailsJSON, borrowerInfoJSON, comakerInfoJSON} = req.body;
     const { loanDetails, borrowerInfo, comakerInfo } = req.body;
     const applicant_id = Number(req.body.applicantId);
     try {
@@ -549,12 +550,16 @@ router.post('/addLoanData', upload.fields([
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {
-            console.log(applicant_id);
+            // console.log(applicant_id);
+            // console.log(loanDetails)
+            const loanDetailsParse = JSON.parse(loanDetails[0]);
+            const borrowerInfoParse = JSON.parse(borrowerInfo[0]);
+            const comakerInfoParse = JSON.parse(comakerInfo[0]);
             // tbl_Loan_Application
             const request1 = new sql.Request(transaction);
             request1.input('applicant_id', sql.Int, applicant_id);
-            request1.input('amount', sql.Float, loanDetails[0].loanAmount);
-            request1.input('loan_type', sql.VarChar, loanDetails[0].loanType);
+            request1.input('amount', sql.Float, loanDetailsParse.loanAmount);
+            request1.input('loan_type', sql.VarChar, loanDetailsParse.loanType);
             const sql1 = `
                 INSERT INTO [tbl_Loan_Application] 
                         ([applicant_id], [amount], [loan_type])
@@ -566,11 +571,11 @@ router.post('/addLoanData', upload.fields([
             const application_id = result1.recordset[0].application_id;
             // tbl_Loan_Details
             const request2 = new sql.Request(transaction);
-            request2.input('loan_amount', sql.Float, loanDetails[0].loanAmount);
-            request2.input('type_of_loan', sql.VarChar, loanDetails[0].loanType);
-            request2.input('term', sql.Int, loanDetails[0].term);
-            request2.input('loan_application_number', sql.VarChar, loanDetails[0].loanNumber);
-            request2.input('purpose', sql.VarChar, loanDetails[0].purpose);
+            request2.input('loan_amount', sql.Float, loanDetailsParse.loanAmount);
+            request2.input('type_of_loan', sql.VarChar, loanDetailsParse.loanType);
+            request2.input('term', sql.Int, loanDetailsParse.term);
+            request2.input('loan_application_number', sql.Int, loanDetailsParse.loanNumber);
+            request2.input('purpose', sql.VarChar, loanDetailsParse.purpose);
             request2.input('borrowers_agreement', sql.VarChar, 'Agreed');
             request2.input('co_makers_agreement', sql.VarChar, 'Agreed');
             request2.input('applicant_id', sql.Int, applicant_id);
@@ -586,24 +591,24 @@ router.post('/addLoanData', upload.fields([
             await request2.query(sql2);
             // tbl_Co_Makers_Information
             const request3 = new sql.Request(transaction);
-            request3.input('co_last_name', sql.VarChar, comakerInfo[0].lastName);
-            request3.input('co_first_name', sql.VarChar, comakerInfo[0].firstname);
-            request3.input('co_middle_initial', sql.VarChar, comakerInfo[0].middleName);
-            request3.input('co_region', sql.VarChar, comakerInfo[0].region);
-            request3.input('co_province', sql.VarChar, comakerInfo[0].province);
-            request3.input('co_city', sql.VarChar, comakerInfo[0].city);
-            request3.input('co_barangay', sql.VarChar, comakerInfo[0].barangay);
-            request3.input('co_street', sql.VarChar, comakerInfo[0].street);
-            request3.input('co_zipcode', sql.VarChar, comakerInfo[0].zipcode);
-            request3.input('co_employee_number', sql.VarChar, comakerInfo[0].employeeNo);
-            request3.input('co_employment_status', sql.VarChar, comakerInfo[0].employeeStatus);
-            request3.input('co_date_of_birth', sql.Date, comakerInfo[0].birth);
-            request3.input('co_age', sql.Int, comakerInfo[0].age);
-            request3.input('co_office', sql.VarChar, comakerInfo[0].office);
-            request3.input('co_monthly_salary', sql.Decimal, comakerInfo[0].salary);
-            request3.input('co_office_tel_number', sql.VarChar, comakerInfo[0].officeTelNo);
-            request3.input('co_years_in_service', sql.Int, comakerInfo[0].yearService);
-            request3.input('co_mobile_number', sql.VarChar, comakerInfo[0].mobileNo);
+            request3.input('co_last_name', sql.VarChar, comakerInfoParse.lastName);
+            request3.input('co_first_name', sql.VarChar, comakerInfoParse.firstname);
+            request3.input('co_middle_initial', sql.VarChar, comakerInfoParse.middleName);
+            request3.input('co_region', sql.VarChar, comakerInfoParse.region);
+            request3.input('co_province', sql.VarChar, comakerInfoParse.province);
+            request3.input('co_city', sql.VarChar, comakerInfoParse.city);
+            request3.input('co_barangay', sql.VarChar, comakerInfoParse.barangay);
+            request3.input('co_street', sql.VarChar, comakerInfoParse.street);
+            request3.input('co_zipcode', sql.VarChar, comakerInfoParse.zipcode);
+            request3.input('co_employee_number', sql.Int, comakerInfoParse.employeeNo);
+            request3.input('co_employment_status', sql.VarChar, comakerInfoParse.employeeStatus);
+            request3.input('co_date_of_birth', sql.Date, comakerInfoParse.birth);
+            request3.input('co_age', sql.Int, comakerInfoParse.age);
+            request3.input('co_office', sql.VarChar, comakerInfoParse.office);
+            request3.input('co_monthly_salary', sql.Decimal, comakerInfoParse.salary);
+            request3.input('co_office_tel_number', sql.Int, comakerInfoParse.officeTelNo);
+            request3.input('co_years_in_service', sql.Int, comakerInfoParse.yearService);
+            request3.input('co_mobile_number', sql.Int, comakerInfoParse.mobileNo);
             request3.input('applicant_id', sql.Int, applicant_id);
             request3.input('application_id', sql.Int, application_id);
             const sql3 = `
@@ -621,24 +626,24 @@ router.post('/addLoanData', upload.fields([
             await request3.query(sql3);
             // tbl_Borrowers_Information
             const request4 = new sql.Request(transaction);
-            request4.input('last_name', sql.VarChar, borrowerInfo[0].lastName);
-            request4.input('first_name', sql.VarChar, borrowerInfo[0].firstname);
-            request4.input('middle_initial', sql.VarChar, borrowerInfo[0].middleName);
-            request4.input('region', sql.VarChar, borrowerInfo[0].region);
-            request4.input('province', sql.VarChar, borrowerInfo[0].province);
-            request4.input('city', sql.VarChar, borrowerInfo[0].city);
-            request4.input('barangay', sql.VarChar, borrowerInfo[0].barangay);
-            request4.input('street', sql.VarChar, borrowerInfo[0].street);
-            request4.input('zipcode', sql.VarChar, borrowerInfo[0].zipcode);
-            request4.input('employee_number', sql.VarChar, borrowerInfo[0].employeeNo);
-            request4.input('employment_status', sql.VarChar, borrowerInfo[0].employeeStatus);
-            request4.input('date_of_birth', sql.Date, borrowerInfo[0].birth);
-            request4.input('age', sql.Int, borrowerInfo[0].age);
-            request4.input('office', sql.VarChar, borrowerInfo[0].office);
-            request4.input('monthly_salary', sql.Decimal, borrowerInfo[0].salary);
-            request4.input('office_tel_number', sql.VarChar, borrowerInfo[0].officeTelNo);
-            request4.input('years_in_service', sql.Int, borrowerInfo[0].yearService);
-            request4.input('mobile_number', sql.VarChar, borrowerInfo[0].mobileNo);
+            request4.input('last_name', sql.VarChar, borrowerInfoParse.lastName);
+            request4.input('first_name', sql.VarChar, borrowerInfoParse.firstname);
+            request4.input('middle_initial', sql.VarChar, borrowerInfoParse.middleName);
+            request4.input('region', sql.VarChar, borrowerInfoParse.region);
+            request4.input('province', sql.VarChar, borrowerInfoParse.province);
+            request4.input('city', sql.VarChar, borrowerInfoParse.city);
+            request4.input('barangay', sql.VarChar, borrowerInfoParse.barangay);
+            request4.input('street', sql.VarChar, borrowerInfoParse.street);
+            request4.input('zipcode', sql.VarChar, borrowerInfoParse.zipcode);
+            request4.input('employee_number', sql.Int, borrowerInfoParse.employeeNo);
+            request4.input('employment_status', sql.VarChar, borrowerInfoParse.employeeStatus);
+            request4.input('date_of_birth', sql.Date, borrowerInfoParse.birth);
+            request4.input('age', sql.Int, borrowerInfoParse.age);
+            request4.input('office', sql.VarChar, borrowerInfoParse.office);
+            request4.input('monthly_salary', sql.Decimal, borrowerInfoParse.salary);
+            request4.input('office_tel_number', sql.Int, borrowerInfoParse.officeTelNo);
+            request4.input('years_in_service', sql.Int, borrowerInfoParse.yearService);
+            request4.input('mobile_number', sql.Int, borrowerInfoParse.mobileNo);
             request4.input('applicant_id', sql.Int, applicant_id);
             request4.input('application_id', sql.Int, application_id);
             const sql4 = `
