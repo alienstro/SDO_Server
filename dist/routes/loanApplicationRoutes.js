@@ -543,8 +543,8 @@ router.post('/addLoanData', upload.fields([
     { name: 'payslipComaker' }
 ]), async (req, res) => {
     // const { loanDetailsJSON, borrowerInfoJSON, comakerInfoJSON} = req.body;
-    const { loanDetails, borrowerInfo, comakerInfo } = req.body;
-    const applicant_id = Number(req.body.applicantId);
+    const { loanDetails, borrowerInfo, comakerInfo, applicantId } = req.body;
+    // const applicant_id = Number(applicantId);
     try {
         const pool = await connectToDatabase();
         const transaction = new sql.Transaction(pool);
@@ -555,6 +555,9 @@ router.post('/addLoanData', upload.fields([
             const loanDetailsParse = JSON.parse(loanDetails[0]);
             const borrowerInfoParse = JSON.parse(borrowerInfo[0]);
             const comakerInfoParse = JSON.parse(comakerInfo[0]);
+            const applicant_id = JSON.parse(applicantId[0]);
+            // console.log(applicant_id);
+            // console.log(req.body)
             // tbl_Loan_Application
             const request1 = new sql.Request(transaction);
             request1.input('applicant_id', sql.Int, applicant_id);
