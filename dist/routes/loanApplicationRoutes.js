@@ -436,7 +436,7 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
         // TODO: add validation only pdf file is allowed
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        const fileUploadLocation = path.join(__dirname, '/../uploads/applicant/');
+        const fileUploadLocation = path.join(__dirname, '/../../uploads/applicant/');
         const outputFolder = path.join(fileUploadLocation, String(applicant_id));
         const filePathDir = path.join(outputFolder, 'documents', String(application_id));
         if (!fs.existsSync(filePathDir)) {
@@ -444,7 +444,7 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
         }
         // This line from PHP: 'http://localhost/sdo_api_v1/applicant/1/documents/1010/authorityToDeduct.pdf';
         // Lol fix this
-        const absFilePath = `/uploads/applicant/${applicant_id}/documents/${application_id}/`;
+        const absFilePath = `/../uploads/applicant/${applicant_id}/documents/${application_id}/`;
         // Loop through each file in req.files
         for (const key in files) {
             if (Object.prototype.hasOwnProperty.call(files, key)) {
