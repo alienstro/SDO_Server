@@ -134,7 +134,7 @@ router.get(
         res.status(200).json(result.recordset);
       } else {
         res
-          .status(404)
+          .status(200)
           .json({ message: "No Loan Applications for Accounting found" });
       }
     } catch (error) {

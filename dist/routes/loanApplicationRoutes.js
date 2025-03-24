@@ -1,11 +1,11 @@
-import { Router } from 'express';
-import { connectToDatabase } from '../database/dbconnection.js';
-import sql from 'mssql';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import { Router } from "express";
+import { connectToDatabase } from "../database/dbconnection.js";
+import sql from "mssql";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 const router = Router();
 // GET METHOD: Fetch loanDetails for Accounting and OSDS
-router.get('/loanApplication/loanDetails', async (req, res) => {
+router.get("/loanApplication/loanDetails", async (req, res) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
@@ -35,16 +35,16 @@ router.get('/loanApplication/loanDetails', async (req, res) => {
             res.status(200).json(result.recordset);
         }
         else {
-            res.status(404).json({ message: 'No Loan Details found' });
+            res.status(404).json({ message: "No Loan Details found" });
         }
     }
     catch (error) {
-        console.error('Failed to retrieve users:', error);
-        res.status(500).json({ message: 'Failed to retrieve users', error });
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
 // GET METHOD: Fetch getLoanApplication2 - To not mess with other call
-router.get('/loanApplication/getLoanApplicationAccounting', async (req, res) => {
+router.get("/loanApplication/getLoanApplicationAccounting", async (req, res) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
@@ -81,16 +81,18 @@ router.get('/loanApplication/getLoanApplicationAccounting', async (req, res) => 
             res.status(200).json(result.recordset);
         }
         else {
-            res.status(404).json({ message: 'No Loan Applications for Accounting found' });
+            res
+                .status(404)
+                .json({ message: "No Loan Applications for Accounting found" });
         }
     }
     catch (error) {
-        console.error('Failed to retrieve users:', error);
-        res.status(500).json({ message: 'Failed to retrieve users', error });
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
 // GET METHOD: Fetch getPaidApplication
-router.get('/loanApplication/getPaidApplication', async (req, res) => {
+router.get("/loanApplication/getPaidApplication", async (req, res) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
@@ -121,16 +123,18 @@ router.get('/loanApplication/getPaidApplication', async (req, res) => {
             res.status(200).json(result.recordset);
         }
         else {
-            res.status(404).json({ message: 'No Loan Applications for Accounting found' });
+            res
+                .status(200)
+                .json({ message: "No Loan Applications for Accounting found" });
         }
     }
     catch (error) {
-        console.error('Failed to retrieve users:', error);
-        res.status(500).json({ message: 'Failed to retrieve users', error });
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
 // GET METHOD: Fetch getCurrentLoanApplication by applicantId
-router.get('/loanApplication/currentLoanApplication/:applicantId', async (req, res) => {
+router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, res) => {
     try {
         const { applicant_id } = req.params;
         const pool = await connectToDatabase();
@@ -140,11 +144,17 @@ router.get('/loanApplication/currentLoanApplication/:applicantId', async (req, r
             WHERE status = 'Pending' AND applicant_id = @applicant_id
             ORDER BY application_date DESC;
         `;
-        const loanResult = await pool.request()
-            .input('applicant_id', applicant_id)
+        const loanResult = await pool
+            .request()
+            .input("applicant_id", applicant_id)
             .query(loanQuery);
         if (loanResult.recordset.length === 0) {
-            return res.status(200).json({ success: true, message: { currentLoan: null, currentHistory: null } });
+            return res
+                .status(200)
+                .json({
+                success: true,
+                message: { currentLoan: null, currentHistory: null },
+            });
         }
         const application_id = loanResult.recordset[0].application_id;
         const historyQuery = `
@@ -153,30 +163,38 @@ router.get('/loanApplication/currentLoanApplication/:applicantId', async (req, r
             WHERE application_id = @application_id
             ORDER BY history_date DESC;
         `;
-        const historyResult = await pool.request()
-            .input('application_id', application_id)
+        const historyResult = await pool
+            .request()
+            .input("application_id", application_id)
             .query(historyQuery);
         return res.status(200).json({
             success: true,
             message: {
                 currentLoan: loanResult.recordset[0],
-                currentHistory: historyResult.recordset.length > 0 ? historyResult.recordset[0] : null
-            }
+                currentHistory: historyResult.recordset.length > 0
+                    ? historyResult.recordset[0]
+                    : null,
+            },
         });
     }
     catch (error) {
-        console.error('Error fetching current loan application:', error);
-        res.status(500).json({ message: 'Failed to retrieve current loan application: ', error });
+        console.error("Error fetching current loan application:", error);
+        res
+            .status(500)
+            .json({
+            message: "Failed to retrieve current loan application: ",
+            error,
+        });
     }
 });
 // GET METHOD: Fetch loanApplicationStatus by applicantId
-router.get('/loanApplication/LoanApplicationStatus/:applicantId', async (req, res) => {
+router.get("/loanApplication/LoanApplicationStatus/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('applicant_id', sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
                     SELECT * FROM tbl_Loan_Application LA
                     JOIN tbl_department_status OS
                     ON LA.application_id = OS.application_id
@@ -185,18 +203,23 @@ router.get('/loanApplication/LoanApplicationStatus/:applicantId', async (req, re
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get loan application status:', error);
-        res.status(500).json({ message: 'Failed to retrieve loan application status: ', error });
+        console.error("Failed to get loan application status:", error);
+        res
+            .status(500)
+            .json({
+            message: "Failed to retrieve loan application status: ",
+            error,
+        });
     }
 });
 // GET METHOD: Fetch loanHistory by applicantId
-router.get('/loanApplication/loanHistory/:applicantId', async (req, res) => {
+router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('applicant_id', sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
                     SELECT 
                     LA.application_id, 
                     LA.application_date, 
@@ -211,18 +234,23 @@ router.get('/loanApplication/loanHistory/:applicantId', async (req, res) => {
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get loan application history:', error);
-        res.status(500).json({ message: 'Failed to retrieve loan application history: ', error });
+        console.error("Failed to get loan application history:", error);
+        res
+            .status(500)
+            .json({
+            message: "Failed to retrieve loan application history: ",
+            error,
+        });
     }
 });
 // GET METHOD: Fetch officeStatus by applicantId
-router.get('/loanApplication/officeStatus/:applicantId', async (req, res) => {
+router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('applicant_id', sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
                     SELECT TOP 9
                     LA.application_id,
                     OS.status,
@@ -240,89 +268,102 @@ router.get('/loanApplication/officeStatus/:applicantId', async (req, res) => {
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get loan application history:', error);
-        res.status(500).json({ message: 'Failed to retrieve loan application history: ', error });
+        console.error("Failed to get loan application history:", error);
+        res
+            .status(500)
+            .json({
+            message: "Failed to retrieve loan application history: ",
+            error,
+        });
     }
 });
 // GET METHOD: Fetch departmentStatus by departmentId
-router.get('/loanApplication/getDepartmentStatus/:departmentId', async (req, res) => {
+router.get("/loanApplication/getDepartmentStatus/:departmentId", async (req, res) => {
     try {
         const { departmentId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('departmentId', sql.Int, departmentId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("departmentId", sql.Int, departmentId).query(`
                 SELECT * FROM tbl_department_status
                 WHERE department_id = @departmentId;
             `);
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get department status:', error);
-        res.status(500).json({ message: 'Failed to retrieve department status: ', error });
+        console.error("Failed to get department status:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve department status: ", error });
     }
 });
 // GET METHOD: Fetch borrowersInformation by applicationId
-router.get('/loanApplication/borrowersInformationById/:applicationId', async (req, res) => {
+router.get("/loanApplication/borrowersInformationById/:applicationId", async (req, res) => {
     try {
         const { applicationId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('application_id', sql.Int, applicationId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("application_id", sql.Int, applicationId).query(`
                 SELECT * FROM [tbl_Borrowers_Information]
                 WHERE application_id = @application_id
             `);
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get Co Makers Information:', error);
-        res.status(500).json({ message: 'Failed to retrieve Co Makers Informatio: ', error });
+        console.error("Failed to get Co Makers Information:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve Co Makers Informatio: ", error });
     }
 });
 // GET METHOD: Fetch coMakersInformationById by applicationId
-router.get('/loanApplication/coMakersInformationById/:applicationId', async (req, res) => {
+router.get("/loanApplication/coMakersInformationById/:applicationId", async (req, res) => {
     try {
         const { applicationId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('application_id', sql.Int, applicationId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("application_id", sql.Int, applicationId).query(`
                 SELECT * FROM [tbl_Co_Makers_Information]
                 WHERE application_id = @application_id
             `);
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get Co Makers Information:', error);
-        res.status(500).json({ message: 'Failed to retrieve Co Makers Information: ', error });
+        console.error("Failed to get Co Makers Information:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve Co Makers Information: ", error });
     }
 });
 // GET METHOD: Fetch assessmentDetailsById by applicationId
-router.get('/loanApplication/getAssessmentDetailsById/:applicationId', async (req, res) => {
+router.get("/loanApplication/getAssessmentDetailsById/:applicationId", async (req, res) => {
     try {
         const { applicationId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('application_id', sql.Int, applicationId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("application_id", sql.Int, applicationId).query(`
                 SELECT * FROM [sdo_accounting].[dbo].[tbl_Assessment_Form] WHERE application_id = @application_id
             `);
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get assessment form:', error);
-        res.status(500).json({ message: 'Failed to retrieve assessment form: ', error });
+        console.error("Failed to get assessment form:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve assessment form: ", error });
     }
 });
 // GET METHOD: Fetch getApplicant by applicantId
-router.get('/loanApplication/getApplicant/:applicantId', async (req, res) => {
+router.get("/loanApplication/getApplicant/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('applicantId', sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicantId", sql.Int, applicantId).query(`
                 SELECT  [applicant_id],
                         [first_name],
                         [middle_name],
@@ -339,17 +380,18 @@ router.get('/loanApplication/getApplicant/:applicantId', async (req, res) => {
         res.status(200).json(result.recordset);
     }
     catch (error) {
-        console.error('Failed to get assessment form:', error);
-        res.status(500).json({ message: 'Failed to retrieve assessment form: ', error });
+        console.error("Failed to get assessment form:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve assessment form: ", error });
     }
 });
 // GET METHOD: Fetch User by Email
-router.get('/users/email/:email/:table/:id_type', async (req, res) => {
+router.get("/users/email/:email/:table/:id_type", async (req, res) => {
     const { email, table, id_type } = req.params;
     try {
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('email', sql.VarChar, email)
+        const result = await pool.request().input("email", sql.VarChar, email)
             .query(`
                 SELECT password, ${id_type} FROM ${table}
                 WHERE email = @email;
@@ -359,21 +401,21 @@ router.get('/users/email/:email/:table/:id_type', async (req, res) => {
             res.status(200).json(user);
         }
         else {
-            res.status(404).json({ message: 'User not found' });
+            res.status(404).json({ message: "User not found" });
         }
     }
     catch (error) {
-        console.error('Failed to retrieve user:', error);
-        res.status(500).json({ message: 'Failed to retrieve user', error });
+        console.error("Failed to retrieve user:", error);
+        res.status(500).json({ message: "Failed to retrieve user", error });
     }
 });
 // GET METHOD: Fetch User Profile
-router.get('/users/profile/:role/:id', async (req, res) => {
+router.get("/users/profile/:role/:id", async (req, res) => {
     const { role, id } = req.params;
     try {
         const pool = await connectToDatabase();
-        let query = '';
-        if (role === 'applicant') {
+        let query = "";
+        if (role === "applicant") {
             query = `
                 SELECT
                 app.applicant_id,
@@ -403,32 +445,29 @@ router.get('/users/profile/:role/:id', async (req, res) => {
                 WHERE sta.staff_id = @id;
             `;
         }
-        const result = await pool.request()
-            .input('id', sql.Int, id)
-            .query(query);
+        const result = await pool.request().input("id", sql.Int, id).query(query);
         const profile = result.recordset[0];
         if (profile) {
             res.status(200).json(profile);
         }
         else {
-            res.status(404).json({ message: 'Profile not found' });
+            res.status(404).json({ message: "Profile not found" });
         }
     }
     catch (error) {
-        console.error('Failed to retrieve profile:', error);
-        res.status(500).json({ message: 'Failed to retrieve profile', error });
+        console.error("Failed to retrieve profile:", error);
+        res.status(500).json({ message: "Failed to retrieve profile", error });
     }
 });
 // POST METHOD: User Login
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+        return res.status(400).json({ message: "Email and password are required" });
     }
     try {
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('email', sql.VarChar, email)
+        const result = await pool.request().input("email", sql.VarChar, email)
             .query(`
                 SELECT staff_id, first_name, last_name, email, password, department_id 
                 FROM tbl_Staff 
@@ -436,81 +475,90 @@ router.post('/login', async (req, res) => {
             `);
         const user = result.recordset[0];
         if (!user) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({ message: "Invalid email or password" });
         }
         // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Invalid password' });
+            return res.status(401).json({ message: "Invalid password" });
         }
         // Generate JWT token
         const token = generateJWT(user.staff_id, user.first_name, user.last_name, user.email, user.department_id);
         res.status(200).json({
             success: true,
-            message: 'Login successful',
+            message: "Login successful",
             token,
-            role: user.department_id
+            role: user.department_id,
         });
     }
     catch (error) {
-        console.error('Failed to login user:', error);
+        console.error("Failed to login user:", error);
         res.status(500).json({
             success: false,
-            message: 'An error occurred',
-            error
+            message: "An error occurred",
+            error,
         });
     }
 });
 const generateJWT = (staff_id, first_name, last_name, email, role) => {
-    const JWT_SECRET = process.env.SECRET_KEY || 'tokentest';
+    const JWT_SECRET = process.env.SECRET_KEY || "tokentest";
     const payload = {
         iss: "localhost",
         aud: "localhost",
-        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
         data: {
             staff_id,
             first_name,
             last_name,
             email,
-            role
+            role,
         },
     };
-    return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
+    return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256" });
 };
 // POST METHOD: Add User
-router.post('/users', async (req, res) => {
-    const { first_name, middle_name, last_name, ext_name, email, institution_name, position_id, emp_status, designation, password } = req.body;
-    if (!first_name || !last_name || !email || !institution_name || !position_id || !emp_status || !designation || !password) {
-        return res.status(400).json({ message: 'All fields are required' });
+router.post("/users", async (req, res) => {
+    const { first_name, middle_name, last_name, ext_name, email, institution_name, position_id, emp_status, designation, password, } = req.body;
+    if (!first_name ||
+        !last_name ||
+        !email ||
+        !institution_name ||
+        !position_id ||
+        !emp_status ||
+        !designation ||
+        !password) {
+        return res.status(400).json({ message: "All fields are required" });
     }
     try {
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input('first_name', sql.VarChar, first_name)
-            .input('middle_name', sql.VarChar, middle_name)
-            .input('last_name', sql.VarChar, last_name)
-            .input('ext_name', sql.VarChar, ext_name)
-            .input('email', sql.VarChar, email)
-            .input('institution_name', sql.VarChar, institution_name)
-            .input('position_id', sql.Int, position_id)
-            .input('emp_status', sql.VarChar, emp_status)
-            .input('designation', sql.VarChar, designation)
-            .input('password', sql.VarChar, password)
-            .query(`
+        const result = await pool
+            .request()
+            .input("first_name", sql.VarChar, first_name)
+            .input("middle_name", sql.VarChar, middle_name)
+            .input("last_name", sql.VarChar, last_name)
+            .input("ext_name", sql.VarChar, ext_name)
+            .input("email", sql.VarChar, email)
+            .input("institution_name", sql.VarChar, institution_name)
+            .input("position_id", sql.Int, position_id)
+            .input("emp_status", sql.VarChar, emp_status)
+            .input("designation", sql.VarChar, designation)
+            .input("password", sql.VarChar, password).query(`
                 INSERT INTO [sdo_accounting].[dbo].[tbl_Applicant] 
                 ([first_name], [middle_name], [last_name], [ext_name], [email], [institution_name], [position_id], [emp_status], [designation], [password])
                 VALUES (@first_name, @middle_name, @last_name, @ext_name, @email, @institution_name, @position_id, @emp_status, @designation, @password)
             `);
-        res.status(201).json({ message: 'User added successfully', user: req.body });
+        res
+            .status(201)
+            .json({ message: "User added successfully", user: req.body });
     }
     catch (error) {
-        console.error('Failed to add user:', error);
-        res.status(500).json({ message: 'Failed to add user', error });
+        console.error("Failed to add user:", error);
+        res.status(500).json({ message: "Failed to add user", error });
     }
 });
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 // Global object to hold file paths (mimicking $this->filePaths)
 let filePaths = {};
 // Helper function to get a file path by key
@@ -522,9 +570,9 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
         // TODO: add validation only pdf file is allowed
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        const fileUploadLocation = path.join(__dirname, '/../../uploads/applicant/');
+        const fileUploadLocation = path.join(__dirname, "/../../uploads/applicant/");
         const outputFolder = path.join(fileUploadLocation, String(applicant_id));
-        const filePathDir = path.join(outputFolder, 'documents', String(application_id));
+        const filePathDir = path.join(outputFolder, "documents", String(application_id));
         if (!fs.existsSync(filePathDir)) {
             fs.mkdirSync(filePathDir, { recursive: true });
         }
@@ -555,20 +603,20 @@ async function fileServiceSaveFile(application_id, applicant_id, files) {
                     filePaths[key] = tempPath;
                 }
                 catch (error) {
-                    console.error('Failed to save file:', error);
+                    console.error("Failed to save file:", error);
                     throw error;
                 }
             }
         }
     }
     catch (error) {
-        console.error('File service error:', error);
+        console.error("File service error:", error);
         throw error;
     }
 }
 async function updateLoanStatusHistory(initiator, application_id, transaction) {
     try {
-        let remarkMsg = '';
+        let remarkMsg = "";
         switch (initiator.toLowerCase()) {
             case "applicant":
                 remarkMsg = "Submitted to OSDS";
@@ -608,25 +656,25 @@ async function updateLoanStatusHistory(initiator, application_id, transaction) {
                 (@application_id, '${remarkMsg}', CURRENT_TIMESTAMP, '${initiator}')
             `;
         const request = new sql.Request(transaction);
-        request.input('application_id', sql.Int, application_id);
+        request.input("application_id", sql.Int, application_id);
         await request.query(query);
     }
     catch (error) {
         throw error;
     }
 }
-import multer from 'multer';
+import multer from "multer";
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 // POST METHOD: Add Loan Application
-router.post('/addLoanData', upload.fields([
-    { name: 'csc' },
-    { name: 'emergency' },
-    { name: 'idComaker' },
-    { name: 'idApplicant' },
-    { name: 'authorityToDeduct' },
-    { name: 'payslipApplicant' },
-    { name: 'payslipComaker' }
+router.post("/addLoanData", upload.fields([
+    { name: "csc" },
+    { name: "emergency" },
+    { name: "idComaker" },
+    { name: "idApplicant" },
+    { name: "authorityToDeduct" },
+    { name: "payslipApplicant" },
+    { name: "payslipComaker" },
 ]), async (req, res) => {
     // const { loanDetailsJSON, borrowerInfoJSON, comakerInfoJSON} = req.body;
     const { loanDetails, borrowerInfo, comakerInfo, applicantId } = req.body;
@@ -646,9 +694,9 @@ router.post('/addLoanData', upload.fields([
             // console.log(req.body)
             // tbl_Loan_Application
             const request1 = new sql.Request(transaction);
-            request1.input('applicant_id', sql.Int, applicant_id);
-            request1.input('amount', sql.Float, loanDetailsParse.loanAmount);
-            request1.input('loan_type', sql.VarChar, loanDetailsParse.loanType);
+            request1.input("applicant_id", sql.Int, applicant_id);
+            request1.input("amount", sql.Float, loanDetailsParse.loanAmount);
+            request1.input("loan_type", sql.VarChar, loanDetailsParse.loanType);
             const sql1 = `
                 INSERT INTO [tbl_Loan_Application] 
                         ([applicant_id], [amount], [loan_type])
@@ -660,15 +708,15 @@ router.post('/addLoanData', upload.fields([
             const application_id = result1.recordset[0].application_id;
             // tbl_Loan_Details
             const request2 = new sql.Request(transaction);
-            request2.input('loan_amount', sql.Float, loanDetailsParse.loanAmount);
-            request2.input('type_of_loan', sql.VarChar, loanDetailsParse.loanType);
-            request2.input('term', sql.Int, loanDetailsParse.term);
-            request2.input('loan_application_number', sql.Int, loanDetailsParse.loanNumber);
-            request2.input('purpose', sql.VarChar, loanDetailsParse.purpose);
-            request2.input('borrowers_agreement', sql.VarChar, 'Agreed');
-            request2.input('co_makers_agreement', sql.VarChar, 'Agreed');
-            request2.input('applicant_id', sql.Int, applicant_id);
-            request2.input('application_id', sql.Int, application_id);
+            request2.input("loan_amount", sql.Float, loanDetailsParse.loanAmount);
+            request2.input("type_of_loan", sql.VarChar, loanDetailsParse.loanType);
+            request2.input("term", sql.Int, loanDetailsParse.term);
+            request2.input("loan_application_number", sql.Int, loanDetailsParse.loanNumber);
+            request2.input("purpose", sql.VarChar, loanDetailsParse.purpose);
+            request2.input("borrowers_agreement", sql.VarChar, "Agreed");
+            request2.input("co_makers_agreement", sql.VarChar, "Agreed");
+            request2.input("applicant_id", sql.Int, applicant_id);
+            request2.input("application_id", sql.Int, application_id);
             const sql2 = `
                 INSERT INTO [tbl_Loan_Details] 
                 ([loan_amount], [type_of_loan], [term], [loan_application_number], 
@@ -680,26 +728,26 @@ router.post('/addLoanData', upload.fields([
             await request2.query(sql2);
             // tbl_Co_Makers_Information
             const request3 = new sql.Request(transaction);
-            request3.input('co_last_name', sql.VarChar, comakerInfoParse.lastName);
-            request3.input('co_first_name', sql.VarChar, comakerInfoParse.firstname);
-            request3.input('co_middle_initial', sql.VarChar, comakerInfoParse.middleName);
-            request3.input('co_region', sql.VarChar, comakerInfoParse.region);
-            request3.input('co_province', sql.VarChar, comakerInfoParse.province);
-            request3.input('co_city', sql.VarChar, comakerInfoParse.city);
-            request3.input('co_barangay', sql.VarChar, comakerInfoParse.barangay);
-            request3.input('co_street', sql.VarChar, comakerInfoParse.street);
-            request3.input('co_zipcode', sql.VarChar, comakerInfoParse.zipcode);
-            request3.input('co_employee_number', sql.Int, comakerInfoParse.employeeNo);
-            request3.input('co_employment_status', sql.VarChar, comakerInfoParse.employeeStatus);
-            request3.input('co_date_of_birth', sql.Date, comakerInfoParse.birth);
-            request3.input('co_age', sql.Int, comakerInfoParse.age);
-            request3.input('co_office', sql.VarChar, comakerInfoParse.office);
-            request3.input('co_monthly_salary', sql.Decimal, comakerInfoParse.salary);
-            request3.input('co_office_tel_number', sql.Int, comakerInfoParse.officeTelNo);
-            request3.input('co_years_in_service', sql.Int, comakerInfoParse.yearService);
-            request3.input('co_mobile_number', sql.Int, comakerInfoParse.mobileNo);
-            request3.input('applicant_id', sql.Int, applicant_id);
-            request3.input('application_id', sql.Int, application_id);
+            request3.input("co_last_name", sql.VarChar, comakerInfoParse.lastName);
+            request3.input("co_first_name", sql.VarChar, comakerInfoParse.firstname);
+            request3.input("co_middle_initial", sql.VarChar, comakerInfoParse.middleName);
+            request3.input("co_region", sql.VarChar, comakerInfoParse.region);
+            request3.input("co_province", sql.VarChar, comakerInfoParse.province);
+            request3.input("co_city", sql.VarChar, comakerInfoParse.city);
+            request3.input("co_barangay", sql.VarChar, comakerInfoParse.barangay);
+            request3.input("co_street", sql.VarChar, comakerInfoParse.street);
+            request3.input("co_zipcode", sql.VarChar, comakerInfoParse.zipcode);
+            request3.input("co_employee_number", sql.Int, comakerInfoParse.employeeNo);
+            request3.input("co_employment_status", sql.VarChar, comakerInfoParse.employeeStatus);
+            request3.input("co_date_of_birth", sql.Date, comakerInfoParse.birth);
+            request3.input("co_age", sql.Int, comakerInfoParse.age);
+            request3.input("co_office", sql.VarChar, comakerInfoParse.office);
+            request3.input("co_monthly_salary", sql.Decimal, comakerInfoParse.salary);
+            request3.input("co_office_tel_number", sql.Int, comakerInfoParse.officeTelNo);
+            request3.input("co_years_in_service", sql.Int, comakerInfoParse.yearService);
+            request3.input("co_mobile_number", sql.Int, comakerInfoParse.mobileNo);
+            request3.input("applicant_id", sql.Int, applicant_id);
+            request3.input("application_id", sql.Int, application_id);
             const sql3 = `
                 INSERT INTO [tbl_Co_Makers_Information] 
                 ([co_last_name], [co_first_name], [co_middle_initial], [co_region], [co_province], 
@@ -715,26 +763,26 @@ router.post('/addLoanData', upload.fields([
             await request3.query(sql3);
             // tbl_Borrowers_Information
             const request4 = new sql.Request(transaction);
-            request4.input('last_name', sql.VarChar, borrowerInfoParse.lastName);
-            request4.input('first_name', sql.VarChar, borrowerInfoParse.firstname);
-            request4.input('middle_initial', sql.VarChar, borrowerInfoParse.middleName);
-            request4.input('region', sql.VarChar, borrowerInfoParse.region);
-            request4.input('province', sql.VarChar, borrowerInfoParse.province);
-            request4.input('city', sql.VarChar, borrowerInfoParse.city);
-            request4.input('barangay', sql.VarChar, borrowerInfoParse.barangay);
-            request4.input('street', sql.VarChar, borrowerInfoParse.street);
-            request4.input('zipcode', sql.VarChar, borrowerInfoParse.zipcode);
-            request4.input('employee_number', sql.Int, borrowerInfoParse.employeeNo);
-            request4.input('employment_status', sql.VarChar, borrowerInfoParse.employeeStatus);
-            request4.input('date_of_birth', sql.Date, borrowerInfoParse.birth);
-            request4.input('age', sql.Int, borrowerInfoParse.age);
-            request4.input('office', sql.VarChar, borrowerInfoParse.office);
-            request4.input('monthly_salary', sql.Decimal, borrowerInfoParse.salary);
-            request4.input('office_tel_number', sql.Int, borrowerInfoParse.officeTelNo);
-            request4.input('years_in_service', sql.Int, borrowerInfoParse.yearService);
-            request4.input('mobile_number', sql.Int, borrowerInfoParse.mobileNo);
-            request4.input('applicant_id', sql.Int, applicant_id);
-            request4.input('application_id', sql.Int, application_id);
+            request4.input("last_name", sql.VarChar, borrowerInfoParse.lastName);
+            request4.input("first_name", sql.VarChar, borrowerInfoParse.firstname);
+            request4.input("middle_initial", sql.VarChar, borrowerInfoParse.middleName);
+            request4.input("region", sql.VarChar, borrowerInfoParse.region);
+            request4.input("province", sql.VarChar, borrowerInfoParse.province);
+            request4.input("city", sql.VarChar, borrowerInfoParse.city);
+            request4.input("barangay", sql.VarChar, borrowerInfoParse.barangay);
+            request4.input("street", sql.VarChar, borrowerInfoParse.street);
+            request4.input("zipcode", sql.VarChar, borrowerInfoParse.zipcode);
+            request4.input("employee_number", sql.Int, borrowerInfoParse.employeeNo);
+            request4.input("employment_status", sql.VarChar, borrowerInfoParse.employeeStatus);
+            request4.input("date_of_birth", sql.Date, borrowerInfoParse.birth);
+            request4.input("age", sql.Int, borrowerInfoParse.age);
+            request4.input("office", sql.VarChar, borrowerInfoParse.office);
+            request4.input("monthly_salary", sql.Decimal, borrowerInfoParse.salary);
+            request4.input("office_tel_number", sql.Int, borrowerInfoParse.officeTelNo);
+            request4.input("years_in_service", sql.Int, borrowerInfoParse.yearService);
+            request4.input("mobile_number", sql.Int, borrowerInfoParse.mobileNo);
+            request4.input("applicant_id", sql.Int, applicant_id);
+            request4.input("application_id", sql.Int, application_id);
             const sql4 = `
                 INSERT INTO [tbl_Borrowers_Information] 
                         ([last_name], [first_name], [middle_initial], [region], [province], 
@@ -752,14 +800,14 @@ router.post('/addLoanData', upload.fields([
             await fileServiceSaveFile(application_id, applicant_id, req.files);
             // tbl_Documents
             const request5 = new sql.Request(transaction);
-            request5.input('cscAppointment_path', sql.VarChar, getFilePath('csc'));
-            request5.input('emergency_path', sql.VarChar, getFilePath('emergency'));
-            request5.input('idComaker_path', sql.VarChar, getFilePath('idComaker'));
-            request5.input('idApplicant_path', sql.VarChar, getFilePath('idApplicant'));
-            request5.input('authorityToDeduct_path', sql.VarChar, getFilePath('authorityToDeduct'));
-            request5.input('payslipApplicant_path', sql.VarChar, getFilePath('payslipApplicant'));
-            request5.input('payslipComaker_path', sql.VarChar, getFilePath('payslipComaker'));
-            request5.input('application_id', sql.Int, application_id);
+            request5.input("cscAppointment_path", sql.VarChar, getFilePath("csc"));
+            request5.input("emergency_path", sql.VarChar, getFilePath("emergency"));
+            request5.input("idComaker_path", sql.VarChar, getFilePath("idComaker"));
+            request5.input("idApplicant_path", sql.VarChar, getFilePath("idApplicant"));
+            request5.input("authorityToDeduct_path", sql.VarChar, getFilePath("authorityToDeduct"));
+            request5.input("payslipApplicant_path", sql.VarChar, getFilePath("payslipApplicant"));
+            request5.input("payslipComaker_path", sql.VarChar, getFilePath("payslipComaker"));
+            request5.input("application_id", sql.Int, application_id);
             const sql5 = `
             INSERT INTO [tbl_Documents]
                 ([cscAppointment_path],
@@ -783,7 +831,7 @@ router.post('/addLoanData', upload.fields([
             await request5.query(sql5);
             // tbl_Signature
             const request6 = new sql.Request(transaction);
-            request6.input('application_id', sql.Int, application_id);
+            request6.input("application_id", sql.Int, application_id);
             const sql6 = `
             INSERT INTO [tbl_Signature]
                 ([application_id])
@@ -793,7 +841,7 @@ router.post('/addLoanData', upload.fields([
             await request6.query(sql6);
             // tbl_Approval
             const request7 = new sql.Request(transaction);
-            request7.input('application_id', sql.Int, application_id);
+            request7.input("application_id", sql.Int, application_id);
             const sql7 = `
             INSERT INTO [tbl_Approval]
                 ([application_id])
@@ -818,9 +866,11 @@ router.post('/addLoanData', upload.fields([
             `;
             await new sql.Request(transaction).query(sql8);
             // Update Loan Status History
-            await updateLoanStatusHistory('Applicant', application_id, transaction);
+            await updateLoanStatusHistory("Applicant", application_id, transaction);
             await transaction.commit();
-            return res.status(201).json({ success: true, message: "All data added successfully." });
+            return res
+                .status(201)
+                .json({ success: true, message: "All data added successfully." });
         }
         catch (err) {
             await transaction.rollback();
@@ -829,28 +879,30 @@ router.post('/addLoanData', upload.fields([
         }
     }
     catch (error) {
-        console.error('Transaction error:', error);
+        console.error("Transaction error:", error);
         return res.status(500).json({ success: false, message: error.message });
     }
 });
 // PATCH METHOD: Update Approval OSDS
-router.patch('/loanApplication/updateApprovalOSDS', async (req, res) => {
+router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
     try {
         const { application_id } = req.body;
-        const office = 'OSDS';
+        const office = "OSDS";
         if (!application_id) {
-            return res.status(400).json({ success: false, message: 'Application ID is required' });
+            return res
+                .status(400)
+                .json({ success: false, message: "Application ID is required" });
         }
         const pool = await connectToDatabase();
         // Begin transaction
         const transaction = pool.transaction();
         await transaction.begin();
         // Update loan status
-        const updateStatusResult = await transaction.request()
-            .input('status', sql.VarChar, 'Approved')
-            .input('office', sql.VarChar, office)
-            .input('application_id', sql.Int, application_id)
-            .query(`
+        const updateStatusResult = await transaction
+            .request()
+            .input("status", sql.VarChar, "Approved")
+            .input("office", sql.VarChar, office)
+            .input("application_id", sql.Int, application_id).query(`
                 UPDATE tbl_department_status
                 SET status = @status,
                     updated_at = CURRENT_TIMESTAMP 
@@ -861,58 +913,66 @@ router.patch('/loanApplication/updateApprovalOSDS', async (req, res) => {
             `);
         if (updateStatusResult.rowsAffected[0] === 0) {
             await transaction.rollback();
-            return res.status(404).json({ success: false, message: 'No matching record found' });
+            return res
+                .status(404)
+                .json({ success: false, message: "No matching record found" });
         }
         // Insert into loan status history
-        let remarkMsg = '';
+        let remarkMsg = "";
         switch (office.toLowerCase()) {
-            case 'applicant':
-                remarkMsg = 'Submitted to OSDS';
+            case "applicant":
+                remarkMsg = "Submitted to OSDS";
                 break;
-            case 'osds':
-                remarkMsg = 'Forwarded to Accounting';
+            case "osds":
+                remarkMsg = "Forwarded to Accounting";
                 break;
-            case 'accounting':
-                remarkMsg = 'For Assessment';
+            case "accounting":
+                remarkMsg = "For Assessment";
                 break;
-            case 'secretariat':
-            case 'hr':
-            case 'admin':
-                remarkMsg = 'For Signature';
+            case "secretariat":
+            case "hr":
+            case "admin":
+                remarkMsg = "For Signature";
                 break;
-            case 'legal':
-            case 'asds':
-                remarkMsg = 'For Endorsement';
+            case "legal":
+            case "asds":
+                remarkMsg = "For Endorsement";
                 break;
-            case 'sds':
-                remarkMsg = 'For Payment Process';
+            case "sds":
+                remarkMsg = "For Payment Process";
                 break;
-            case 'payment':
-                remarkMsg = 'Payment Confirm';
+            case "payment":
+                remarkMsg = "Payment Confirm";
                 break;
             default:
-                remarkMsg = 'Status Updated';
+                remarkMsg = "Status Updated";
                 break;
         }
-        const insertHistoryResult = await transaction.request()
-            .input('application_id', sql.Int, application_id)
-            .input('remarks', sql.VarChar, remarkMsg)
-            .input('initiator', sql.VarChar, office)
-            .query(`
+        const insertHistoryResult = await transaction
+            .request()
+            .input("application_id", sql.Int, application_id)
+            .input("remarks", sql.VarChar, remarkMsg)
+            .input("initiator", sql.VarChar, office).query(`
                 INSERT INTO tbl_application_status_history (application_id, remarks, history_date, initiator)
                 VALUES (@application_id, @remarks, CURRENT_TIMESTAMP, @initiator);
             `);
         if (insertHistoryResult.rowsAffected[0] === 0) {
             await transaction.rollback();
-            return res.status(500).json({ success: false, message: 'Failed to insert status history' });
+            return res
+                .status(500)
+                .json({ success: false, message: "Failed to insert status history" });
         }
         // Commit transaction
         await transaction.commit();
-        res.status(200).json({ success: true, message: 'Loan status updated successfully!' });
+        res
+            .status(200)
+            .json({ success: true, message: "Loan status updated successfully!" });
     }
     catch (error) {
-        console.error('Failed to update loan status:', error);
-        res.status(500).json({ message: 'Failed to update approval OSDS', error });
+        console.error("Failed to update loan status:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to update approval OSDS", error });
     }
 });
 export default router;
