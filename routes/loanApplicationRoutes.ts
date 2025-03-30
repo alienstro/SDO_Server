@@ -48,6 +48,58 @@ router.get(
   }
 );
 
+// GET METHOD: Fetch loanDetails for Accounting and OSDS By ID
+router.get(
+  "/loanApplication/getLoanDetailsById/:applicationId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const applicationId = parseInt(req.params.applicationId);
+
+      if (isNaN(applicationId)) {
+        return res.status(400).json({ message: "Invalid applicationId" });
+      }
+
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input("applicationId", applicationId)
+        .query(`
+          SELECT 
+            ld.loan_details_id,
+            ld.loan_amount,
+            ld.type_of_loan,
+            ld.term,
+            ld.loan_application_number,
+            ld.purpose,
+            ld.borrowers_agreement,
+            ld.co_makers_agreement,
+            ld.applicant_id,
+            ld.application_id,
+            ld.date_submitted,
+            a.last_name,
+            a.first_name,
+            a.middle_name,
+            a.designation,
+            la.is_approved_osds
+          FROM tbl_Loan_Application la
+          JOIN tbl_Loan_Details ld ON la.application_id = ld.application_id
+          JOIN tbl_Applicant a ON la.applicant_id = a.applicant_id
+          WHERE ld.application_id = @applicationId;
+        `);
+
+      if (result.recordset.length > 0) {
+        res.status(200).json(result.recordset[0]);
+      } else {
+        res.status(404).json({ message: "No loan details found for the given applicationId" });
+      }
+    } catch (error) {
+      console.error("Error fetching loan details:", error);
+      res.status(500).json({ message: "Internal server error", error });
+    }
+  }
+);
+
+
 // GET METHOD: Fetch getLoanApplication2 - To not mess with other call
 router.get(
   "/loanApplication/getLoanApplicationAccounting",
