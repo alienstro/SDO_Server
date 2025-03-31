@@ -1021,4 +1021,96 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
             .json({ message: "Failed to update approval OSDS", error });
     }
 });
+// PATCH METHOD: Update Approval OSDS
+router.patch("/loanApplication/updateApprovalAccounting", async (req, res) => {
+    try {
+        const { application_id } = req.body;
+        const office = "Accounting";
+        if (!application_id) {
+            return res
+                .status(400)
+                .json({ success: false, message: "Application ID is required" });
+        }
+        const pool = await connectToDatabase();
+        // Begin transaction
+        const transaction = pool.transaction();
+        await transaction.begin();
+        // Update loan status
+        const updateStatusResult = await transaction
+            .request()
+            .input("status", sql.VarChar, "Approved")
+            .input("office", sql.VarChar, office)
+            .input("application_id", sql.Int, application_id).query(`
+                UPDATE tbl_department_status
+                SET status = @status,
+                    updated_at = CURRENT_TIMESTAMP 
+                FROM tbl_department_status AS tas
+                INNER JOIN tbl_department AS toff
+                ON tas.department_id = toff.department_id
+                WHERE toff.department_name = @office AND tas.application_id = @application_id;
+            `);
+        if (updateStatusResult.rowsAffected[0] === 0) {
+            await transaction.rollback();
+            return res
+                .status(404)
+                .json({ success: false, message: "No matching record found" });
+        }
+        // Insert into loan status history
+        let remarkMsg = "";
+        switch (office.toLowerCase()) {
+            case "applicant":
+                remarkMsg = "Submitted to OSDS";
+                break;
+            case "osds":
+                remarkMsg = "Forwarded to Accounting";
+                break;
+            case "accounting":
+                remarkMsg = "For Assessment";
+                break;
+            case "secretariat":
+            case "hr":
+            case "admin":
+                remarkMsg = "For Signature";
+                break;
+            case "legal":
+            case "asds":
+                remarkMsg = "For Endorsement";
+                break;
+            case "sds":
+                remarkMsg = "For Payment Process";
+                break;
+            case "payment":
+                remarkMsg = "Payment Confirm";
+                break;
+            default:
+                remarkMsg = "Status Updated";
+                break;
+        }
+        const insertHistoryResult = await transaction
+            .request()
+            .input("application_id", sql.Int, application_id)
+            .input("remarks", sql.VarChar, remarkMsg)
+            .input("initiator", sql.VarChar, office).query(`
+                INSERT INTO tbl_application_status_history (application_id, remarks, history_date, initiator)
+                VALUES (@application_id, @remarks, CURRENT_TIMESTAMP, @initiator);
+            `);
+        if (insertHistoryResult.rowsAffected[0] === 0) {
+            await transaction.rollback();
+            return res
+                .status(500)
+                .json({ success: false, message: "Failed to insert status history" });
+        }
+        // Commit transaction
+        await transaction.commit();
+        res
+            .status(200)
+            .json({ success: true, message: "Loan status updated successfully!" });
+    }
+    catch (error) {
+        console.error("Failed to update loan status:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to update approval OSDS", error });
+    }
+});
 export default router;
