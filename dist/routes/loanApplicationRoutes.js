@@ -43,6 +43,26 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
+// GET METHOD: Fetch loanDetails for Signature
+router.get("/loanApplication/getSignatureDetails", async (req, res) => {
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request().query(`
+            SELECT * 
+            FROM [tbl_Signature]; 
+        `);
+        if (result.recordset.length > 0) {
+            res.status(200).json(result.recordset);
+        }
+        else {
+            res.status(404).json({ message: "No Loan Details found" });
+        }
+    }
+    catch (error) {
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
+    }
+});
 // GET METHOD: Fetch loanDetails for Secretariat
 router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
     try {
@@ -88,6 +108,57 @@ router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
+// GET METHOD: Fetch loanDetails for Signature by Id
+router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req, res) => {
+    try {
+        const departmentId = parseInt(req.params.departmentId);
+        if (departmentId !== 4) {
+            return res.status(400).json({ message: "Invalid DepartmentId" });
+        }
+        const pool = await connectToDatabase();
+        const result = await pool.request().input("departmentId", departmentId)
+            .query(`
+           SELECT 
+                ld.loan_details_id,
+                ld.loan_amount,
+                ld.type_of_loan,
+                ld.term,
+                ld.loan_application_number,
+                ld.purpose,
+                ld.borrowers_agreement,
+                ld.co_makers_agreement,
+                ld.applicant_id,
+                ld.application_id,
+                ld.date_submitted,
+                a.last_name,
+                a.first_name,
+                a.middle_name,
+                la.department_id,
+                la.status
+                    FROM tbl_department_status la
+                    JOIN tbl_Loan_Details ld
+                        ON la.application_id = ld.application_id
+                    JOIN tbl_Applicant a
+                        ON ld.applicant_id = a.applicant_id
+                    WHERE la.department_id = @departmentId AND la.application_id IN (
+                    SELECT application_id
+                    FROM tbl_department_status
+                    WHERE department_id = 3 AND status = 'Approved');
+        `);
+        if (result.recordset.length > 0) {
+            res.status(200).json(result.recordset);
+        }
+        else {
+            res.status(404).json({
+                message: "No loan details found for the given applicationId",
+            });
+        }
+    }
+    catch (error) {
+        console.error("Error fetching loan details:", error);
+        res.status(500).json({ message: "Internal server error", error });
+    }
+});
 // GET METHOD: Fetch loanDetails for Accounting and OSDS By ID
 router.get("/loanApplication/getLoanDetailsById/:applicationId", async (req, res) => {
     try {
@@ -124,9 +195,7 @@ router.get("/loanApplication/getLoanDetailsById/:applicationId", async (req, res
             res.status(200).json(result.recordset[0]);
         }
         else {
-            res
-                .status(404)
-                .json({
+            res.status(404).json({
                 message: "No loan details found for the given applicationId",
             });
         }
@@ -607,7 +676,7 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         const pool = await connectToDatabase();
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
-        const toYesNo = (val) => val === true || val === 'true' ? 'Yes' : 'No';
+        const toYesNo = (val) => val === true || val === "true" ? "Yes" : "No";
         const request = new sql.Request(transaction);
         await request
             .input("loan_application_form", sql.VarChar(50), toYesNo(data.loanApplicationForm))
@@ -646,8 +715,7 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
             .input("processed_by", sql.VarChar(50), data.processedBy)
             .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
             .input("remarks", sql.VarChar(250), (_b = data.remarks) !== null && _b !== void 0 ? _b : null)
-            .input("application_id", sql.Int, data.application_id)
-            .query(`
+            .input("application_id", sql.Int, data.application_id).query(`
         INSERT INTO tbl_Assessment_Form (
           loan_application_form, authorization_to_deduct, latest_pay_slip,
           photocopy_deped_id, approved_appointment, proof_co_terminus, others,
@@ -676,20 +744,118 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         await request2
             .input("status", sql.VarChar(50), "Approved")
             .input("application_id", sql.Int, data.application_id)
-            .input("department_id", sql.Int, data.department_id)
-            .query(`
+            .input("department_id", sql.Int, data.department_id).query(`
         UPDATE tbl_department_status
         SET status = @status, updated_at = CURRENT_TIMESTAMP
         WHERE application_id = @application_id AND department_id = @department_id
       `);
         await transaction.commit();
-        res.status(201).json({ message: "Loan assessment added successfully", data, 'success': true });
+        res.status(201).json({
+            message: "Loan assessment added successfully",
+            data,
+            success: true,
+        });
     }
     catch (error) {
         console.error("Failed to assess loan application:", error);
-        res.status(500).json({ message: "Failed to assess loan application", error });
+        res
+            .status(500)
+            .json({ message: "Failed to assess loan application", error });
     }
 });
+// POST METHOD: Submit HR Signature
+router.post("/loanApplication/submitSignatureHR", async (req, res) => {
+    const data = req.body;
+    console.log(data);
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const checkRequest = new sql.Request(transaction);
+        const checkResult = await checkRequest
+            .input("application_id", sql.Int, data.application_id)
+            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
+        if (checkResult.recordset.length > 0) {
+            // If exists, update
+            const signatureId = checkResult.recordset[0].signature_id;
+            const updateRequest = new sql.Request(transaction);
+            await updateRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_hr", sql.Int, data.staff_id)
+                .input("signature_hr", sql.NVarChar, data.signature)
+                .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_hr = @staff_id_hr,
+                signature_hr = @signature_hr
+            WHERE signature_id = @signature_id
+          `);
+        }
+        else {
+            // No record, insert new
+            const insertRequest = new sql.Request(transaction);
+            await insertRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_hr", sql.Int, data.staff_id)
+                .input("signature_hr", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_hr, signature_hr)
+            VALUES (@application_id, @staff_id_hr, @signature_hr)
+          `);
+        }
+        // Update loan status
+        // const statusRequest = new sql.Request(transaction);
+        // await statusRequest
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department", sql.VarChar(50), "HR").query(`
+        //     UPDATE tbl_department_status
+        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //     WHERE application_id = @application_id AND department = @department
+        //   `);
+        await transaction.commit();
+        res.status(200).json({
+            message: checkResult.recordset.length > 0
+                ? "Signature updated successfully."
+                : "Signature added successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("submitSignatureHR error:", error);
+        res.status(500).json({ message: "Failed to submit HR signature", error });
+    }
+});
+// PATCH METHOD: Update Loan Status
+export async function updateLoanStatus(office, status, application_id) {
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const query = `
+        UPDATE tbl_department_status
+        SET status = @status,
+            updated_at = CURRENT_TIMESTAMP 
+        FROM tbl_department_status AS tas
+        INNER JOIN tbl_department AS toff
+        ON tas.department_id = toff.department_id
+        WHERE toff.department_name = @office AND tas.application_id = @application_id;
+      `;
+        const request = new sql.Request(transaction);
+        request.input("status", sql.VarChar, status);
+        request.input("office", sql.VarChar, office);
+        request.input("application_id", sql.VarChar, application_id);
+        await request.query(query);
+        const applicationId = parseInt(application_id);
+        // Call the method using `this`
+        await updateLoanStatusHistory(office, applicationId, transaction);
+        await transaction.commit();
+        return "Application status updated successfully!";
+    }
+    catch (error) {
+        console.error("Error in updateLoanStatus:", error);
+        throw new Error("Failed to update loan status");
+    }
+}
 // POST METHOD: Add User
 router.post("/users", async (req, res) => {
     const { first_name, middle_name, last_name, ext_name, email, institution_name, position_id, emp_status, designation, password, } = req.body;
