@@ -112,9 +112,9 @@ router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
 router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req, res) => {
     try {
         const departmentId = parseInt(req.params.departmentId);
-        if (departmentId !== 4) {
-            return res.status(400).json({ message: "Invalid DepartmentId" });
-        }
+        // if (departmentId !== 4) {
+        //   return res.status(400).json({ message: "Invalid DepartmentId" });
+        // }
         const pool = await connectToDatabase();
         const result = await pool.request().input("departmentId", departmentId)
             .query(`
@@ -823,6 +823,130 @@ router.post("/loanApplication/submitSignatureHR", async (req, res) => {
     catch (error) {
         console.error("submitSignatureHR error:", error);
         res.status(500).json({ message: "Failed to submit HR signature", error });
+    }
+});
+// POST METHOD: Submit Admin Signature
+router.post("/loanApplication/submitSignatureAdmin", async (req, res) => {
+    const data = req.body;
+    console.log(data);
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const checkRequest = new sql.Request(transaction);
+        const checkResult = await checkRequest
+            .input("application_id", sql.Int, data.application_id)
+            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
+        if (checkResult.recordset.length > 0) {
+            // If exists, update
+            const signatureId = checkResult.recordset[0].signature_id;
+            const updateRequest = new sql.Request(transaction);
+            await updateRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_admin", sql.Int, data.staff_id)
+                .input("signature_admin", sql.NVarChar, data.signature)
+                .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_admin = @staff_id_admin,
+                signature_admin = @signature_admin
+            WHERE signature_id = @signature_id
+          `);
+        }
+        else {
+            // No record, insert new
+            const insertRequest = new sql.Request(transaction);
+            await insertRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_admin", sql.Int, data.staff_id)
+                .input("signature_admin", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_admin, signature_admin)
+            VALUES (@application_id, @staff_id_admin, @signature_admin)
+          `);
+        }
+        // Update loan status
+        // const statusRequest = new sql.Request(transaction);
+        // await statusRequest
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department", sql.VarChar(50), "HR").query(`
+        //     UPDATE tbl_department_status
+        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //     WHERE application_id = @application_id AND department = @department
+        //   `);
+        await transaction.commit();
+        res.status(200).json({
+            message: checkResult.recordset.length > 0
+                ? "Signature updated successfully."
+                : "Signature added successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("submitSignatureAdmin error:", error);
+        res.status(500).json({ message: "Failed to submit Admin signature", error });
+    }
+});
+// POST METHOD: Submit Legal Signature
+router.post("/loanApplication/submitSignatureLegal", async (req, res) => {
+    const data = req.body;
+    console.log(data);
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const checkRequest = new sql.Request(transaction);
+        const checkResult = await checkRequest
+            .input("application_id", sql.Int, data.application_id)
+            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
+        if (checkResult.recordset.length > 0) {
+            // If exists, update
+            const signatureId = checkResult.recordset[0].signature_id;
+            const updateRequest = new sql.Request(transaction);
+            await updateRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_legal", sql.Int, data.staff_id)
+                .input("signature_legal", sql.NVarChar, data.signature)
+                .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_legal = @staff_id_legal,
+                signature_legal = @signature_legal
+            WHERE signature_id = @signature_id
+          `);
+        }
+        else {
+            // No record, insert new
+            const insertRequest = new sql.Request(transaction);
+            await insertRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_legal", sql.Int, data.staff_id)
+                .input("signature_legal", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_legal, signature_legal)
+            VALUES (@application_id, @staff_id_legal, @signature_legal)
+          `);
+        }
+        // Update loan status
+        // const statusRequest = new sql.Request(transaction);
+        // await statusRequest
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department", sql.VarChar(50), "HR").query(`
+        //     UPDATE tbl_department_status
+        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //     WHERE application_id = @application_id AND department = @department
+        //   `);
+        await transaction.commit();
+        res.status(200).json({
+            message: checkResult.recordset.length > 0
+                ? "Signature updated successfully."
+                : "Signature added successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("submitSignatureAdmin error:", error);
+        res.status(500).json({ message: "Failed to submit Admin signature", error });
     }
 });
 // PATCH METHOD: Update Loan Status
