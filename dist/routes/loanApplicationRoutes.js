@@ -43,6 +43,51 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
+// GET METHOD: Fetch loanDetails for Secretariat
+router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool.request().query(`
+            SELECT 
+                ld.loan_details_id,
+                ld.loan_amount,
+                ld.type_of_loan,
+                ld.term,
+                ld.loan_application_number,
+                ld.purpose,
+                ld.borrowers_agreement,
+                ld.co_makers_agreement,
+                ld.applicant_id,
+                ld.application_id,
+                ld.date_submitted,
+                a.last_name,
+                a.first_name,
+                a.middle_name,
+                la.department_id,
+                la.status
+                    FROM tbl_department_status la
+                    JOIN tbl_Loan_Details ld
+                        ON la.application_id = ld.application_id
+                    JOIN tbl_Applicant a
+                        ON ld.applicant_id = a.applicant_id
+                    WHERE la.department_id = 3 AND la.application_id IN (
+                    SELECT application_id
+                    FROM tbl_department_status
+                    WHERE department_id = 2 AND status = 'approved'
+            );
+        `);
+        if (result.recordset.length > 0) {
+            res.status(200).json(result.recordset);
+        }
+        else {
+            res.status(404).json({ message: "No Loan Details found" });
+        }
+    }
+    catch (error) {
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
+    }
+});
 // GET METHOD: Fetch loanDetails for Accounting and OSDS By ID
 router.get("/loanApplication/getLoanDetailsById/:applicationId", async (req, res) => {
     try {
@@ -51,9 +96,7 @@ router.get("/loanApplication/getLoanDetailsById/:applicationId", async (req, res
             return res.status(400).json({ message: "Invalid applicationId" });
         }
         const pool = await connectToDatabase();
-        const result = await pool
-            .request()
-            .input("applicationId", applicationId)
+        const result = await pool.request().input("applicationId", applicationId)
             .query(`
           SELECT 
             ld.loan_details_id,
@@ -81,7 +124,11 @@ router.get("/loanApplication/getLoanDetailsById/:applicationId", async (req, res
             res.status(200).json(result.recordset[0]);
         }
         else {
-            res.status(404).json({ message: "No loan details found for the given applicationId" });
+            res
+                .status(404)
+                .json({
+                message: "No loan details found for the given applicationId",
+            });
         }
     }
     catch (error) {
@@ -195,9 +242,7 @@ router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, r
             .input("applicant_id", applicant_id)
             .query(loanQuery);
         if (loanResult.recordset.length === 0) {
-            return res
-                .status(200)
-                .json({
+            return res.status(200).json({
                 success: true,
                 message: { currentLoan: null, currentHistory: null },
             });
@@ -225,9 +270,7 @@ router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, r
     }
     catch (error) {
         console.error("Error fetching current loan application:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Failed to retrieve current loan application: ",
             error,
         });
@@ -250,9 +293,7 @@ router.get("/loanApplication/LoanApplicationStatus/:applicantId", async (req, re
     }
     catch (error) {
         console.error("Failed to get loan application status:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Failed to retrieve loan application status: ",
             error,
         });
@@ -281,9 +322,7 @@ router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
     }
     catch (error) {
         console.error("Failed to get loan application history:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Failed to retrieve loan application history: ",
             error,
         });
@@ -315,9 +354,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
     }
     catch (error) {
         console.error("Failed to get loan application history:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Failed to retrieve loan application history: ",
             error,
         });
@@ -562,6 +599,97 @@ const generateJWT = (staff_id, first_name, last_name, email, role) => {
     };
     return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256" });
 };
+// POST METHOD: Assess Loan Application
+router.post("/loanApplication/assessLoanApplication", async (req, res) => {
+    var _a, _b;
+    const data = req.body;
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const toYesNo = (val) => val === true || val === 'true' ? 'Yes' : 'No';
+        const request = new sql.Request(transaction);
+        await request
+            .input("loan_application_form", sql.VarChar(50), toYesNo(data.loanApplicationForm))
+            .input("authorization_to_deduct", sql.VarChar(50), toYesNo(data.authorizationToDeduct))
+            .input("latest_pay_slip", sql.VarChar(50), toYesNo(data.latestPaySlip))
+            .input("photocopy_deped_id", sql.VarChar(50), toYesNo(data.photocopyDepEdId))
+            .input("approved_appointment", sql.VarChar(50), toYesNo(data.approvedAppointment))
+            .input("proof_co_terminus", sql.VarChar(50), toYesNo(data.proofCoTerminus))
+            .input("others", sql.VarChar(250), (_a = data.othersSpecify) !== null && _a !== void 0 ? _a : null)
+            .input("letter_of_request", sql.VarChar(50), toYesNo(data.letterOfRequest))
+            .input("hospitalization", sql.VarChar(50), toYesNo(data.hospitalization))
+            .input("medical_abstract", sql.VarChar(50), toYesNo(data.medicalAbstract))
+            .input("barangay", sql.VarChar(50), toYesNo(data.barangayCertificate))
+            .input("signed_filled_laf", sql.VarChar(50), toYesNo(data.signedFilledLaf))
+            .input("complete_supporting_documents", sql.VarChar(50), toYesNo(data.completeSupportingDocs))
+            .input("authorized_signature_laf", sql.VarChar(50), toYesNo(data.authorizedSignatureLaf))
+            .input("borrower_reaches_retirement", sql.VarChar(50), toYesNo(data.borrowerReachesRetirement))
+            .input("borrowers_age", sql.Int, data.borrowersAge)
+            .input("comakers_reaches_retirement", sql.VarChar(50), toYesNo(data.comakersReachesRetirement))
+            .input("comakers_age", sql.Int, data.comakersAge)
+            .input("borrowers_has_outstanding_balance", sql.VarChar(50), toYesNo(data.borrowersOutstandingPfLoan))
+            .input("current_loan_balance", sql.Decimal(10, 2), data.currentLoanBalance)
+            .input("past_due_loan", sql.Decimal(10, 2), data.pastDueLoan)
+            .input("number_of_years_past_due", sql.Int, data.numberOfYearsPastDue)
+            .input("number_of_months_past_due", sql.Int, data.numberOfMonthsPastDue)
+            .input("borrowers_take_home_pay", sql.VarChar(50), toYesNo(data.borrowersTakeHomePay))
+            .input("paid_30_percent", sql.VarChar(50), toYesNo(data.paid30Percent))
+            .input("percentage_of_principal_paid", sql.Int, data.percentageOfPrincipalPaid)
+            .input("principal_loan_amount", sql.Decimal(10, 2), data.principalLoanAmount)
+            .input("principal", sql.Decimal(10, 2), data.principal)
+            .input("interest", sql.Decimal(10, 2), data.interest)
+            .input("net_proceeds", sql.Decimal(10, 2), data.netProceeds)
+            .input("net_take_home_pay_after_deduction", sql.Decimal(10, 2), data.netTakeHomePayAfterAmortization)
+            .input("monthly_amortization", sql.Decimal(10, 2), data.monthlyAmortization)
+            .input("period_of_loan", sql.Int, data.periodOfLoan)
+            .input("processed_by", sql.VarChar(50), data.processedBy)
+            .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
+            .input("remarks", sql.VarChar(250), (_b = data.remarks) !== null && _b !== void 0 ? _b : null)
+            .input("application_id", sql.Int, data.application_id)
+            .query(`
+        INSERT INTO tbl_Assessment_Form (
+          loan_application_form, authorization_to_deduct, latest_pay_slip,
+          photocopy_deped_id, approved_appointment, proof_co_terminus, others,
+          letter_of_request, hospitalization, medical_abstract, barangay,
+          signed_filled_laf, complete_supporting_documents, authorized_signature_laf,
+          borrower_reaches_retirement, borrowers_age, comakers_reaches_retirement, comakers_age,
+          borrowers_has_outstanding_balance, current_loan_balance, past_due_loan,
+          number_of_years_past_due, number_of_months_past_due, borrowers_take_home_pay,
+          paid_30_percent, percentage_of_principal_paid, principal_loan_amount,
+          principal, interest, net_proceeds, net_take_home_pay_after_deduction,
+          monthly_amortization, period_of_loan, processed_by, reviewed_by, remarks, application_id
+        ) VALUES (
+          @loan_application_form, @authorization_to_deduct, @latest_pay_slip,
+          @photocopy_deped_id, @approved_appointment, @proof_co_terminus, @others,
+          @letter_of_request, @hospitalization, @medical_abstract, @barangay,
+          @signed_filled_laf, @complete_supporting_documents, @authorized_signature_laf,
+          @borrower_reaches_retirement, @borrowers_age, @comakers_reaches_retirement, @comakers_age,
+          @borrowers_has_outstanding_balance, @current_loan_balance, @past_due_loan,
+          @number_of_years_past_due, @number_of_months_past_due, @borrowers_take_home_pay,
+          @paid_30_percent, @percentage_of_principal_paid, @principal_loan_amount,
+          @principal, @interest, @net_proceeds, @net_take_home_pay_after_deduction,
+          @monthly_amortization, @period_of_loan, @processed_by, @reviewed_by, @remarks, @application_id
+        )
+      `);
+        const request2 = new sql.Request(transaction);
+        await request2
+            .input("status", sql.VarChar(50), "Approved")
+            .input("application_id", sql.Int, data.application_id)
+            .input("department_id", sql.Int, data.department_id)
+            .query(`
+        UPDATE tbl_department_status
+        SET status = @status, updated_at = CURRENT_TIMESTAMP
+        WHERE application_id = @application_id AND department_id = @department_id
+      `);
+        await transaction.commit();
+        res.status(201).json({ message: "Loan assessment added successfully", data, 'success': true });
+    }
+    catch (error) {
+        console.error("Failed to assess loan application:", error);
+        res.status(500).json({ message: "Failed to assess loan application", error });
+    }
+});
 // POST METHOD: Add User
 router.post("/users", async (req, res) => {
     const { first_name, middle_name, last_name, ext_name, email, institution_name, position_id, emp_status, designation, password, } = req.body;
@@ -1021,7 +1149,7 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
             .json({ message: "Failed to update approval OSDS", error });
     }
 });
-// PATCH METHOD: Update Approval OSDS
+// PATCH METHOD: Update Approval Accounting
 router.patch("/loanApplication/updateApprovalAccounting", async (req, res) => {
     try {
         const { application_id } = req.body;
