@@ -175,6 +175,30 @@ router.get(
   }
 );
 
+// GET METHOD: Fetch Approval Details
+router.get(
+  "/loanApplication/getApprovalDetails",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const pool = await connectToDatabase();
+      const result = await pool.request().query(`
+        SELECT * FROM [sdo_accounting].[dbo].[tbl_Approval]
+        `);
+
+      if (result.recordset.length > 0) {
+        res.status(200).json(result.recordset);
+      } else {
+        res.status(404).json({
+          message: "No approval details found for the given applicationId",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching approval details:", error);
+      res.status(500).json({ message: "Internal server error", error });
+    }
+  }
+);
+
 // GET METHOD: Fetch loanDetails for Accounting and OSDS By ID
 router.get(
   "/loanApplication/getLoanDetailsById/:applicationId",
@@ -1022,6 +1046,8 @@ router.post(
 
       await transaction.commit();
 
+      updateLoanStatus("HR", "Approved", data.application_id);
+
       res.status(200).json({
         message:
           checkResult.recordset.length > 0
@@ -1097,6 +1123,8 @@ router.post(
 
       await transaction.commit();
 
+      updateLoanStatus("Admin", "Approved", data.application_id);
+
       res.status(200).json({
         message:
           checkResult.recordset.length > 0
@@ -1106,7 +1134,9 @@ router.post(
       });
     } catch (error) {
       console.error("submitSignatureAdmin error:", error);
-      res.status(500).json({ message: "Failed to submit Admin signature", error });
+      res
+        .status(500)
+        .json({ message: "Failed to submit Admin signature", error });
     }
   }
 );
@@ -1159,18 +1189,9 @@ router.post(
           `);
       }
 
-      // Update loan status
-      // const statusRequest = new sql.Request(transaction);
-      // await statusRequest
-      //   .input("status", sql.VarChar(50), "Approved")
-      //   .input("application_id", sql.Int, data.application_id)
-      //   .input("department", sql.VarChar(50), "HR").query(`
-      //     UPDATE tbl_department_status
-      //     SET status = @status, updated_at = CURRENT_TIMESTAMP
-      //     WHERE application_id = @application_id AND department = @department
-      //   `);
-
       await transaction.commit();
+
+      updateLoanStatus("Legal", "Approved", data.application_id);
 
       res.status(200).json({
         message:
@@ -1181,10 +1202,141 @@ router.post(
       });
     } catch (error) {
       console.error("submitSignatureAdmin error:", error);
-      res.status(500).json({ message: "Failed to submit Admin signature", error });
+      res
+        .status(500)
+        .json({ message: "Failed to submit Admin signature", error });
     }
   }
 );
+
+// POST METHOD: Submit Approval ASDS
+router.post(
+  "/loanApplication/submitApprovalASDS",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    console.log(data);
+
+    try {
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      const checkRequest = new sql.Request(transaction);
+      const checkResult = await checkRequest
+        .input("application_id", sql.Int, data.application_id)
+        .query(
+          `SELECT [approval_id] FROM [tbl_Approval] WHERE [application_id] = @application_id`
+        );
+
+      if (checkResult.recordset.length > 0) {
+        // If exists, update
+        const updateRequest = new sql.Request(transaction);
+        await updateRequest
+          .input("status_asds", sql.VarChar, data.approved)
+          .input("staff_id_asds", sql.Int, data.staff_id)
+          .input("approval_id", sql.Int, checkResult.recordset[0].approval_id)
+          .query(`
+            UPDATE [tbl_Approval] 
+            SET [status_asds] = @status_asds,
+                [staff_id_asds] = @staff_id_asds
+            WHERE [approval_id] = @approval_id
+          `);
+      } else {
+        // If not, rollback and return error response
+        await transaction.rollback();
+        return res.status(404).json({ success: false, message: "Can't find approval data." });
+      }
+
+      await transaction.commit();
+
+      try {
+        await updateLoanStatus("ASDS", "Approved", data.application_id);
+      } catch (err) {
+        console.error("Error in updateLoanStatus:", err);
+        return res.status(500).json({ success: false, message: "Failed to update loan status." });
+      }
+
+      res.status(200).json({
+        message: "Approval updated successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("submitApprovalASDS error:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to submit ASDS Approval", error });
+    }
+  }
+);
+
+
+// POST METHOD: Submit Approval SDS
+router.post(
+  "/loanApplication/submitApprovalSDS",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    console.log(data);
+
+    try {
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      console.log(data.application_id);
+
+      const checkRequest = new sql.Request(transaction);
+      const checkResult = await checkRequest
+        .input("application_id", sql.Int, data.application_id)
+        .query(
+          `SELECT [approval_id] FROM [tbl_Approval] WHERE [application_id] = @application_id`
+        );
+
+
+
+      if (checkResult.recordset.length > 0) {
+
+        console.log(checkResult.recordset);
+        // If exists, update
+        const updateRequest = new sql.Request(transaction);
+        await updateRequest
+          .input("status_sds", sql.VarChar, data.approved)
+          .input("staff_id_sds", sql.Int, data.staff_id)
+          .input("approval_id", sql.Int, checkResult.recordset[0].approval_id)
+          .query(`
+            UPDATE [tbl_Approval] 
+            SET [status_sds] = @status_sds,
+                [staff_id_sds] = @staff_id_sds
+            WHERE [approval_id] = @approval_id
+          `);
+      } else {
+        // Rollback and send error if approval not found
+        await transaction.rollback();
+        return res.status(404).json({ success: false, message: "Can't find approval data." });
+      }
+
+      await transaction.commit();
+
+      // Safely await and handle updateLoanStatus
+      try {
+        await updateLoanStatus("SDS", "Approved", data.application_id);
+      } catch (err) {
+        console.error("Error in updateLoanStatus:", err);
+        return res.status(500).json({ success: false, message: "Failed to update loan status." });
+      }
+
+      res.status(200).json({
+        message: "Approval updated successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("submitApprovalSDS error:", error);
+      res.status(500).json({ message: "Failed to submit SDS Approval", error });
+    }
+  }
+);
+
 
 // PATCH METHOD: Update Loan Status
 export async function updateLoanStatus(
@@ -1210,10 +1362,10 @@ export async function updateLoanStatus(
     const request = new sql.Request(transaction);
     request.input("status", sql.VarChar, status);
     request.input("office", sql.VarChar, office);
-    request.input("application_id", sql.VarChar, application_id);
+    request.input("application_id", sql.Int, application_id);
     await request.query(query);
 
-    const applicationId = parseInt(application_id)
+    const applicationId = parseInt(application_id);
 
     // Call the method using `this`
     await updateLoanStatusHistory(office, applicationId, transaction);
