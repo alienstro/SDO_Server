@@ -319,7 +319,7 @@ router.get("/loanApplication/getPaidApplication", async (req, res) => {
 // GET METHOD: Fetch getCurrentLoanApplication by applicantId
 router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, res) => {
     try {
-        const { applicant_id } = req.params;
+        const { applicantId } = req.params;
         const pool = await connectToDatabase();
         const loanQuery = `
             SELECT TOP 1 * 
@@ -329,11 +329,13 @@ router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, r
         `;
         const loanResult = await pool
             .request()
-            .input("applicant_id", applicant_id)
+            .input("applicant_id", applicantId)
             .query(loanQuery);
-        if (loanResult.recordset.length === 0) {
+        if (!loanResult.recordset[0]) {
+            // console.log(loanResult.recordset)
+            // console.log(applicantId)
             return res.status(200).json({
-                success: true,
+                success: false,
                 message: { currentLoan: null, currentHistory: null },
             });
         }
@@ -348,6 +350,8 @@ router.get("/loanApplication/currentLoanApplication/:applicantId", async (req, r
             .request()
             .input("application_id", application_id)
             .query(historyQuery);
+        console.log(loanResult.recordset[0]);
+        console.log(historyResult.recordset[0]);
         return res.status(200).json({
             success: true,
             message: {
@@ -468,6 +472,147 @@ router.get("/loanApplication/getDepartmentStatus/:departmentId", async (req, res
         res
             .status(500)
             .json({ message: "Failed to retrieve department status: ", error });
+    }
+});
+// GET METHOD: Fetch loanApplicationStatus by loanApplicationId
+router.get("/loanApplication/loanApplicationStatus/:applicantId", async (req, res) => {
+    try {
+        const { applicantId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
+              SELECT * FROM tbl_Loan_Application LA
+            JOIN tbl_department_status OS
+            ON LA.application_id = OS.application_id
+            WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id;
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error("Failed to get loan application status:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to retrieve loan application status: ", error });
+    }
+});
+// // GET METHOD: Fetch currentLoanApplication by loanApplicationId
+// router.get(
+//   "/loanApplication/currentLoanApplication/:applicantId",
+//   async (req: Request, res: Response): Promise<any> => {
+//     try {
+//       const { applicantId } = req.params;
+//       const pool = await connectToDatabase();
+//       const loanResult = await pool.request()
+//         .input("applicant_id", sql.Int, applicantId)
+//         .query(`
+//           SELECT TOP 1 *
+//           FROM tbl_Loan_Application
+//           WHERE status = 'Pending' AND applicant_id = @applicant_id
+//           ORDER BY application_date DESC;
+//         `);
+//       const currentLoan = loanResult.recordset[0];
+//       if (!currentLoan) {
+//         return res.status(200).json({
+//           success: true,
+//           message: {
+//             currentLoan: null,
+//             currentHistory: null
+//           }
+//         });
+//       }
+//       const historyResult = await pool.request()
+//         .input("application_id", sql.Int, currentLoan.application_id)
+//         .query(`
+//           SELECT TOP 1 *
+//           FROM tbl_application_status_history
+//           WHERE application_id = @application_id
+//           ORDER BY history_date DESC;
+//         `);
+//       const currentHistory = historyResult.recordset[0] || null;
+//       console.log(currentLoan)
+//       console.log(currentHistory)
+//       res.status(200).json({
+//         success: true,
+//         message: {
+//           currentLoan,
+//           currentHistory
+//         }
+//       });
+//     } catch (error) {
+//       console.error("Error fetching current loan application:", error);
+//       res.status(500).json({
+//         success: false,
+//         message: "Server error while fetching loan application.",
+//         error
+//       });
+//     }
+//   }
+// );
+// GET METHOD: Fetch loanHistory by loanApplicationId
+router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
+    try {
+        const { applicantId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input("applicant_id", sql.Int, applicantId)
+            .query(`
+          SELECT 
+            LA.application_id, 
+            LA.application_date, 
+            LA.is_qualified, 
+            LA.amount,
+            LD.loan_application_number
+          FROM tbl_Loan_Application AS LA
+          JOIN tbl_Loan_Details LD ON LA.application_id = LD.application_id
+          WHERE LA.applicant_id = @applicant_id;
+        `);
+        res.status(200).json({
+            success: true,
+            message: result.recordset
+        });
+    }
+    catch (error) {
+        console.error("Error fetching loan application history:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching loan application history.",
+            error
+        });
+    }
+});
+// GET METHOD: Fetch officeStatus by loanApplicationId
+router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
+    try {
+        const { applicantId } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool.request()
+            .input("applicant_id", sql.Int, applicantId)
+            .query(`
+          SELECT TOP 9
+            LA.application_id,
+            OS.status,
+            OS.updated_at,
+            O.department_name,
+            O.sequence_order
+          FROM tbl_Loan_Application LA
+          JOIN tbl_department_status OS ON LA.application_id = OS.application_id
+          JOIN tbl_Department O ON OS.department_id = O.department_id
+          WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id
+          ORDER BY LA.applicant_id DESC;
+        `);
+        res.status(200).json({
+            success: true,
+            message: result.recordset
+        });
+    }
+    catch (error) {
+        console.error("Error fetching office status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching office status.",
+            error
+        });
     }
 });
 // GET METHOD: Fetch borrowersInformation by applicationId
