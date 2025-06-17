@@ -1235,6 +1235,7 @@ router.post(
   }
 );
 
+
 // POST METHOD: Submit Admin Signature
 router.post(
   "/loanApplication/submitSignatureAdmin",
@@ -2040,6 +2041,43 @@ router.post(
     } catch (error: any) {
       console.error("Transaction error:", error);
       return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// PATCH METHOD: Update department 9 status to 'Paid'
+router.patch(
+  "/paid",
+  async (req: Request, res: Response): Promise<any> => {
+    const { application_id } = req.body;
+
+    try {
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      const updateRequest = new sql.Request(transaction);
+      await updateRequest
+        .input("application_id", sql.Int, application_id)
+        .input("department_id", sql.Int, 9)
+        .input("status", sql.VarChar(50), "Paid")
+        .query(`
+          UPDATE tbl_department_status
+          SET status = @status, updated_at = CURRENT_TIMESTAMP
+          WHERE application_id = @application_id AND department_id = @department_id
+        `);
+
+      await transaction.commit();
+
+      res.status(200).json({
+        message: "Payment status updated successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("updatePaymentStatus error:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to update payment status", error });
     }
   }
 );
