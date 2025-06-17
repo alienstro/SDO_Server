@@ -391,8 +391,8 @@ router.get(
         .input("application_id", application_id)
         .query(historyQuery);
 
-        console.log(loanResult.recordset[0])
-        console.log(historyResult.recordset[0])
+      console.log(loanResult.recordset[0]);
+      console.log(historyResult.recordset[0]);
 
       return res.status(200).json({
         success: true,
@@ -560,7 +560,10 @@ router.get(
       console.error("Failed to get loan application status:", error);
       res
         .status(500)
-        .json({ message: "Failed to retrieve loan application status: ", error });
+        .json({
+          message: "Failed to retrieve loan application status: ",
+          error,
+        });
     }
   }
 );
@@ -636,9 +639,9 @@ router.get(
 
       const pool = await connectToDatabase();
 
-      const result = await pool.request()
-        .input("applicant_id", sql.Int, applicantId)
-        .query(`
+      const result = await pool
+        .request()
+        .input("applicant_id", sql.Int, applicantId).query(`
           SELECT 
             LA.application_id, 
             LA.application_date, 
@@ -652,14 +655,14 @@ router.get(
 
       res.status(200).json({
         success: true,
-        message: result.recordset
+        message: result.recordset,
       });
     } catch (error) {
       console.error("Error fetching loan application history:", error);
       res.status(500).json({
         success: false,
         message: "Server error while fetching loan application history.",
-        error
+        error,
       });
     }
   }
@@ -674,9 +677,9 @@ router.get(
 
       const pool = await connectToDatabase();
 
-      const result = await pool.request()
-        .input("applicant_id", sql.Int, applicantId)
-        .query(`
+      const result = await pool
+        .request()
+        .input("applicant_id", sql.Int, applicantId).query(`
           SELECT TOP 9
             LA.application_id,
             OS.status,
@@ -692,14 +695,14 @@ router.get(
 
       res.status(200).json({
         success: true,
-        message: result.recordset
+        message: result.recordset,
       });
     } catch (error) {
       console.error("Error fetching office status:", error);
       res.status(500).json({
         success: false,
         message: "Server error while fetching office status.",
-        error
+        error,
       });
     }
   }
@@ -1235,7 +1238,6 @@ router.post(
   }
 );
 
-
 // POST METHOD: Submit Admin Signature
 router.post(
   "/loanApplication/submitSignatureAdmin",
@@ -1419,7 +1421,9 @@ router.post(
       } else {
         // If not, rollback and return error response
         await transaction.rollback();
-        return res.status(404).json({ success: false, message: "Can't find approval data." });
+        return res
+          .status(404)
+          .json({ success: false, message: "Can't find approval data." });
       }
 
       await transaction.commit();
@@ -1428,7 +1432,9 @@ router.post(
         await updateLoanStatus("ASDS", "Approved", data.application_id);
       } catch (err) {
         console.error("Error in updateLoanStatus:", err);
-        return res.status(500).json({ success: false, message: "Failed to update loan status." });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to update loan status." });
       }
 
       res.status(200).json({
@@ -1443,7 +1449,6 @@ router.post(
     }
   }
 );
-
 
 // POST METHOD: Submit Approval SDS
 router.post(
@@ -1467,10 +1472,7 @@ router.post(
           `SELECT [approval_id] FROM [tbl_Approval] WHERE [application_id] = @application_id`
         );
 
-
-
       if (checkResult.recordset.length > 0) {
-
         console.log(checkResult.recordset);
         // If exists, update
         const updateRequest = new sql.Request(transaction);
@@ -1487,7 +1489,9 @@ router.post(
       } else {
         // Rollback and send error if approval not found
         await transaction.rollback();
-        return res.status(404).json({ success: false, message: "Can't find approval data." });
+        return res
+          .status(404)
+          .json({ success: false, message: "Can't find approval data." });
       }
 
       await transaction.commit();
@@ -1497,7 +1501,9 @@ router.post(
         await updateLoanStatus("SDS", "Approved", data.application_id);
       } catch (err) {
         console.error("Error in updateLoanStatus:", err);
-        return res.status(500).json({ success: false, message: "Failed to update loan status." });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to update loan status." });
       }
 
       res.status(200).json({
@@ -1510,7 +1516,6 @@ router.post(
     }
   }
 );
-
 
 // PATCH METHOD: Update Loan Status
 export async function updateLoanStatus(
@@ -1768,10 +1773,10 @@ router.post(
       try {
         // console.log(applicant_id);
         // console.log(loanDetails)
-        const loanDetailsParse = JSON.parse(loanDetails[0]);
-        const borrowerInfoParse = JSON.parse(borrowerInfo[0]);
-        const comakerInfoParse = JSON.parse(comakerInfo[0]);
-        const applicant_id = JSON.parse(applicantId[0]);
+        const loanDetailsParse = JSON.parse(loanDetails);
+        const borrowerInfoParse = JSON.parse(borrowerInfo);
+        const comakerInfoParse = JSON.parse(comakerInfo);
+        const applicant_id = Number(applicantId); 
 
         // console.log(applicant_id);
         // console.log(req.body)
@@ -2046,41 +2051,35 @@ router.post(
 );
 
 // PATCH METHOD: Update department 9 status to 'Paid'
-router.patch(
-  "/paid",
-  async (req: Request, res: Response): Promise<any> => {
-    const { application_id } = req.body;
+router.patch("/paid", async (req: Request, res: Response): Promise<any> => {
+  const { application_id } = req.body;
 
-    try {
-      const pool = await connectToDatabase();
-      const transaction = new sql.Transaction(pool);
-      await transaction.begin();
+  try {
+    const pool = await connectToDatabase();
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-      const updateRequest = new sql.Request(transaction);
-      await updateRequest
-        .input("application_id", sql.Int, application_id)
-        .input("department_id", sql.Int, 9)
-        .input("status", sql.VarChar(50), "Paid")
-        .query(`
+    const updateRequest = new sql.Request(transaction);
+    await updateRequest
+      .input("application_id", sql.Int, application_id)
+      .input("department_id", sql.Int, 9)
+      .input("status", sql.VarChar(50), "Paid").query(`
           UPDATE tbl_department_status
           SET status = @status, updated_at = CURRENT_TIMESTAMP
           WHERE application_id = @application_id AND department_id = @department_id
         `);
 
-      await transaction.commit();
+    await transaction.commit();
 
-      res.status(200).json({
-        message: "Payment status updated successfully.",
-        success: true,
-      });
-    } catch (error) {
-      console.error("updatePaymentStatus error:", error);
-      res
-        .status(500)
-        .json({ message: "Failed to update payment status", error });
-    }
+    res.status(200).json({
+      message: "Payment status updated successfully.",
+      success: true,
+    });
+  } catch (error) {
+    console.error("updatePaymentStatus error:", error);
+    res.status(500).json({ message: "Failed to update payment status", error });
   }
-);
+});
 
 // PATCH METHOD: Update Approval OSDS
 router.patch(

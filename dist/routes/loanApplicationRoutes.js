@@ -493,7 +493,10 @@ router.get("/loanApplication/loanApplicationStatus/:applicantId", async (req, re
         console.error("Failed to get loan application status:", error);
         res
             .status(500)
-            .json({ message: "Failed to retrieve loan application status: ", error });
+            .json({
+            message: "Failed to retrieve loan application status: ",
+            error,
+        });
     }
 });
 // // GET METHOD: Fetch currentLoanApplication by loanApplicationId
@@ -554,9 +557,9 @@ router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input("applicant_id", sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
           SELECT 
             LA.application_id, 
             LA.application_date, 
@@ -569,7 +572,7 @@ router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
         `);
         res.status(200).json({
             success: true,
-            message: result.recordset
+            message: result.recordset,
         });
     }
     catch (error) {
@@ -577,7 +580,7 @@ router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error while fetching loan application history.",
-            error
+            error,
         });
     }
 });
@@ -586,9 +589,9 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool.request()
-            .input("applicant_id", sql.Int, applicantId)
-            .query(`
+        const result = await pool
+            .request()
+            .input("applicant_id", sql.Int, applicantId).query(`
           SELECT TOP 9
             LA.application_id,
             OS.status,
@@ -603,7 +606,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
         `);
         res.status(200).json({
             success: true,
-            message: result.recordset
+            message: result.recordset,
         });
     }
     catch (error) {
@@ -611,7 +614,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error while fetching office status.",
-            error
+            error,
         });
     }
 });
@@ -1141,7 +1144,9 @@ router.post("/loanApplication/submitApprovalASDS", async (req, res) => {
         else {
             // If not, rollback and return error response
             await transaction.rollback();
-            return res.status(404).json({ success: false, message: "Can't find approval data." });
+            return res
+                .status(404)
+                .json({ success: false, message: "Can't find approval data." });
         }
         await transaction.commit();
         try {
@@ -1149,7 +1154,9 @@ router.post("/loanApplication/submitApprovalASDS", async (req, res) => {
         }
         catch (err) {
             console.error("Error in updateLoanStatus:", err);
-            return res.status(500).json({ success: false, message: "Failed to update loan status." });
+            return res
+                .status(500)
+                .json({ success: false, message: "Failed to update loan status." });
         }
         res.status(200).json({
             message: "Approval updated successfully.",
@@ -1194,7 +1201,9 @@ router.post("/loanApplication/submitApprovalSDS", async (req, res) => {
         else {
             // Rollback and send error if approval not found
             await transaction.rollback();
-            return res.status(404).json({ success: false, message: "Can't find approval data." });
+            return res
+                .status(404)
+                .json({ success: false, message: "Can't find approval data." });
         }
         await transaction.commit();
         // Safely await and handle updateLoanStatus
@@ -1203,7 +1212,9 @@ router.post("/loanApplication/submitApprovalSDS", async (req, res) => {
         }
         catch (err) {
             console.error("Error in updateLoanStatus:", err);
-            return res.status(500).json({ success: false, message: "Failed to update loan status." });
+            return res
+                .status(500)
+                .json({ success: false, message: "Failed to update loan status." });
         }
         res.status(200).json({
             message: "Approval updated successfully.",
@@ -1416,10 +1427,10 @@ router.post("/addLoanData", upload.fields([
         try {
             // console.log(applicant_id);
             // console.log(loanDetails)
-            const loanDetailsParse = JSON.parse(loanDetails[0]);
-            const borrowerInfoParse = JSON.parse(borrowerInfo[0]);
-            const comakerInfoParse = JSON.parse(comakerInfo[0]);
-            const applicant_id = JSON.parse(applicantId[0]);
+            const loanDetailsParse = JSON.parse(loanDetails);
+            const borrowerInfoParse = JSON.parse(borrowerInfo);
+            const comakerInfoParse = JSON.parse(comakerInfo);
+            const applicant_id = Number(applicantId);
             // console.log(applicant_id);
             // console.log(req.body)
             // tbl_Loan_Application
@@ -1624,8 +1635,7 @@ router.patch("/paid", async (req, res) => {
         await updateRequest
             .input("application_id", sql.Int, application_id)
             .input("department_id", sql.Int, 9)
-            .input("status", sql.VarChar(50), "Paid")
-            .query(`
+            .input("status", sql.VarChar(50), "Paid").query(`
           UPDATE tbl_department_status
           SET status = @status, updated_at = CURRENT_TIMESTAMP
           WHERE application_id = @application_id AND department_id = @department_id
@@ -1638,9 +1648,7 @@ router.patch("/paid", async (req, res) => {
     }
     catch (error) {
         console.error("updatePaymentStatus error:", error);
-        res
-            .status(500)
-            .json({ message: "Failed to update payment status", error });
+        res.status(500).json({ message: "Failed to update payment status", error });
     }
 });
 // PATCH METHOD: Update Approval OSDS
