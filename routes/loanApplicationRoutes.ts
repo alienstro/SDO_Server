@@ -346,9 +346,9 @@ router.get(
   }
 );
 
-// GET METHOD: Fetch getCurrentLoanApplication by applicantId
+// GET METHOD: Fetch all pending applications by applicantId
 router.get(
-  "/loanApplication/currentLoanApplication/:applicantId",
+  "/loanApplication/allPendingApplications/:applicantId",
   async (req: Request, res: Response): Promise<any> => {
     try {
       const { applicantId } = req.params;
@@ -356,7 +356,7 @@ router.get(
       const pool = await connectToDatabase();
 
       const loanQuery = `
-            SELECT TOP 1 * 
+            SELECT * 
             FROM tbl_Loan_Application 
             WHERE status = 'Pending' AND applicant_id = @applicant_id
             ORDER BY application_date DESC;
@@ -367,47 +367,40 @@ router.get(
         .input("applicant_id", applicantId)
         .query(loanQuery);
 
-      if (!loanResult.recordset[0]) {
-        // console.log(loanResult.recordset)
-        // console.log(applicantId)
-
+      if (!loanResult.recordset.length) {
         return res.status(200).json({
           success: false,
-          message: { currentLoan: null, currentHistory: null },
+          message: []
         });
       }
 
-      const application_id = loanResult.recordset[0].application_id;
+      const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+        const historyQuery = `
+              SELECT TOP 1 * 
+              FROM tbl_application_status_history
+              WHERE application_id = @application_id
+              ORDER BY history_date DESC;
+          `;
 
-      const historyQuery = `
-            SELECT TOP 1 * 
-            FROM tbl_application_status_history
-            WHERE application_id = @application_id
-            ORDER BY history_date DESC;
-        `;
+        const historyResult = await pool
+          .request()
+          .input("application_id", loan.application_id)
+          .query(historyQuery);
 
-      const historyResult = await pool
-        .request()
-        .input("application_id", application_id)
-        .query(historyQuery);
-
-      console.log(loanResult.recordset[0]);
-      console.log(historyResult.recordset[0]);
+        return {
+          currentLoan: loan,
+          currentHistory: historyResult.recordset.length > 0 ? historyResult.recordset[0] : null
+        };
+      }));
 
       return res.status(200).json({
         success: true,
-        message: {
-          currentLoan: loanResult.recordset[0],
-          currentHistory:
-            historyResult.recordset.length > 0
-              ? historyResult.recordset[0]
-              : null,
-        },
+        message: applications
       });
     } catch (error) {
-      console.error("Error fetching current loan application:", error);
+      console.error("Error fetching all pending applications:", error);
       res.status(500).json({
-        message: "Failed to retrieve current loan application: ",
+        message: "Failed to retrieve pending applications: ",
         error,
       });
     }
@@ -487,7 +480,7 @@ router.get(
       const result = await pool
         .request()
         .input("applicant_id", sql.Int, applicantId).query(`
-                    SELECT TOP 9
+                    SELECT 
                     LA.application_id,
                     OS.status,
                     OS.updated_at,
@@ -609,8 +602,6 @@ router.get(
 
 //       const currentHistory = historyResult.recordset[0] || null;
 
-//       console.log(currentLoan)
-//       console.log(currentHistory)
 
 //       res.status(200).json({
 //         success: true,
@@ -1167,7 +1158,7 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
-    console.log(data);
+    // console.log(data);
 
     try {
       const pool = await connectToDatabase();
@@ -1244,7 +1235,7 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
-    console.log(data);
+    // console.log(data);
 
     try {
       const pool = await connectToDatabase();
@@ -1323,7 +1314,7 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
-    console.log(data);
+    // console.log(data);
 
     try {
       const pool = await connectToDatabase();
@@ -1391,7 +1382,7 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
-    console.log(data);
+    // console.log(data);
 
     try {
       const pool = await connectToDatabase();
@@ -1456,14 +1447,14 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
-    console.log(data);
+    // console.log(data);
 
     try {
       const pool = await connectToDatabase();
       const transaction = new sql.Transaction(pool);
       await transaction.begin();
 
-      console.log(data.application_id);
+      // console.log(data.application_id);
 
       const checkRequest = new sql.Request(transaction);
       const checkResult = await checkRequest
@@ -1473,7 +1464,7 @@ router.post(
         );
 
       if (checkResult.recordset.length > 0) {
-        console.log(checkResult.recordset);
+        // console.log(checkResult.recordset);
         // If exists, update
         const updateRequest = new sql.Request(transaction);
         await updateRequest
