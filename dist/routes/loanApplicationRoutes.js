@@ -85,14 +85,14 @@ router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
                 a.middle_name,
                 la.department_id,
                 la.status
-                    FROM tbl_department_status la
+                    FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = 3 AND la.application_id IN (
                     SELECT application_id
-                    FROM tbl_department_status
+                    FROM tbl_Department_Status
                     WHERE department_id = 2 AND status = 'approved'
             );
         `);
@@ -135,14 +135,14 @@ router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req,
                 a.middle_name,
                 la.department_id,
                 la.status
-                    FROM tbl_department_status la
+                    FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = @departmentId AND la.application_id IN (
                     SELECT application_id
-                    FROM tbl_department_status
+                    FROM tbl_Department_Status
                     WHERE department_id = 3 AND status = 'Approved');
         `);
         if (result.recordset.length > 0) {
@@ -246,7 +246,7 @@ router.get("/loanApplication/getLoanApplicationAccounting", async (req, res) => 
             FROM tbl_Loan_Application LA
             JOIN tbl_Applicant APP
             ON LA.applicant_id = APP.applicant_id
-            JOIN tbl_department_status ApS
+            JOIN tbl_Department_Status ApS
             ON LA.application_id = ApS.application_id
             JOIN tbl_Department O
             ON Aps.department_id = O.department_id
@@ -294,7 +294,7 @@ router.get("/loanApplication/getPaidApplication", async (req, res) => {
                 FROM tbl_Loan_Application LA
                 JOIN tbl_Applicant APP
                 ON LA.applicant_id = APP.applicant_id
-                JOIN tbl_department_status ApS
+                JOIN tbl_Department_Status ApS
                 ON LA.application_id = ApS.application_id
                 JOIN tbl_department O
                 ON Aps.department_id = O.department_id
@@ -340,7 +340,7 @@ router.get("/loanApplication/allPendingApplications/:applicantId", async (req, r
         const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
             const historyQuery = `
               SELECT TOP 1 * 
-              FROM tbl_application_status_history
+              FROM tbl_Application_Status_History
               WHERE application_id = @application_id
               ORDER BY history_date DESC;
           `;
@@ -375,7 +375,7 @@ router.get("/loanApplication/LoanApplicationStatus/:applicantId", async (req, re
             .request()
             .input("applicant_id", sql.Int, applicantId).query(`
                     SELECT * FROM tbl_Loan_Application LA
-                    JOIN tbl_department_status OS
+                    JOIN tbl_Department_Status OS
                     ON LA.application_id = OS.application_id
                     WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id;
             `);
@@ -433,7 +433,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
                     O.department_name,
                     O.sequence_order
                     FROM tbl_Loan_Application LA
-                    JOIN tbl_department_status OS
+                    JOIN tbl_Department_Status OS
                     ON LA.application_id = OS.application_id
                     JOIN tbl_Department O
                     ON OS.department_id = O.department_id 
@@ -458,7 +458,7 @@ router.get("/loanApplication/getDepartmentStatus/:departmentId", async (req, res
         const result = await pool
             .request()
             .input("departmentId", sql.Int, departmentId).query(`
-                SELECT * FROM tbl_department_status
+                SELECT * FROM tbl_Department_Status
                 WHERE department_id = @departmentId;
             `);
         res.status(200).json(result.recordset);
@@ -479,7 +479,7 @@ router.get("/loanApplication/loanApplicationStatus/:applicantId", async (req, re
             .request()
             .input("applicant_id", sql.Int, applicantId).query(`
               SELECT * FROM tbl_Loan_Application LA
-            JOIN tbl_department_status OS
+            JOIN tbl_Department_Status OS
             ON LA.application_id = OS.application_id
             WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id;
             `);
@@ -524,7 +524,7 @@ router.get("/loanApplication/loanApplicationStatus/:applicantId", async (req, re
 //         .input("application_id", sql.Int, currentLoan.application_id)
 //         .query(`
 //           SELECT TOP 1 *
-//           FROM tbl_application_status_history
+//           FROM tbl_Application_Status_History
 //           WHERE application_id = @application_id
 //           ORDER BY history_date DESC;
 //         `);
@@ -593,7 +593,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
             O.department_name,
             O.sequence_order
           FROM tbl_Loan_Application LA
-          JOIN tbl_department_status OS ON LA.application_id = OS.application_id
+          JOIN tbl_Department_Status OS ON LA.application_id = OS.application_id
           JOIN tbl_Department O ON OS.department_id = O.department_id
           WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id
           ORDER BY LA.applicant_id DESC;
@@ -908,7 +908,7 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
             .input("status", sql.VarChar(50), "Approved")
             .input("application_id", sql.Int, data.application_id)
             .input("department_id", sql.Int, data.department_id).query(`
-        UPDATE tbl_department_status
+        UPDATE tbl_Department_Status
         SET status = @status, updated_at = CURRENT_TIMESTAMP
         WHERE application_id = @application_id AND department_id = @department_id
       `);
@@ -924,6 +924,132 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         res
             .status(500)
             .json({ message: "Failed to assess loan application", error });
+    }
+});
+// POST METHOD: Submit Accounting Signature
+router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
+    const data = req.body;
+    // console.log(data);
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const checkRequest = new sql.Request(transaction);
+        const checkResult = await checkRequest
+            .input("application_id", sql.Int, data.application_id)
+            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
+        if (checkResult.recordset.length > 0) {
+            // If exists, update
+            const signatureId = checkResult.recordset[0].signature_id;
+            const updateRequest = new sql.Request(transaction);
+            await updateRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_accounting", sql.Int, data.staff_id)
+                .input("signature_accounting", sql.NVarChar, data.signature)
+                .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_accounting = @staff_id_accounting,
+                signature_accounting = @signature_accounting
+            WHERE signature_id = @signature_id
+          `);
+        }
+        else {
+            // No record, insert new
+            const insertRequest = new sql.Request(transaction);
+            await insertRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_accounting", sql.Int, data.staff_id)
+                .input("signature_accounting", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_accounting, signature_accounting)
+            VALUES (@application_id, @staff_id_accounting, @signature_accounting)
+          `);
+        }
+        // Update loan status
+        // const statusRequest = new sql.Request(transaction);
+        // await statusRequest
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department", sql.VarChar(50), "HR").query(`
+        //     UPDATE tbl_Department_Status
+        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //     WHERE application_id = @application_id AND department = @department
+        //   `);
+        await transaction.commit();
+        updateLoanStatus("Accounting", "Approved", data.application_id);
+        res.status(200).json({
+            message: checkResult.recordset.length > 0
+                ? "Signature updated successfully."
+                : "Signature added successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("submitSignatureAccounting error:", error);
+        res.status(500).json({ message: "Failed to submit Accounting signature", error });
+    }
+});
+// POST METHOD: Submit Secretariat Signature
+router.post("/loanApplication/submitSignatureSecretariat", async (req, res) => {
+    const data = req.body;
+    // console.log(data);
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const checkRequest = new sql.Request(transaction);
+        const checkResult = await checkRequest
+            .input("application_id", sql.Int, data.application_id)
+            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
+        if (checkResult.recordset.length > 0) {
+            // If exists, update
+            const signatureId = checkResult.recordset[0].signature_id;
+            const updateRequest = new sql.Request(transaction);
+            await updateRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_secretariat", sql.Int, data.staff_id)
+                .input("signature_secretariat", sql.NVarChar, data.signature)
+                .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_secretariat = @staff_id_secretariat,
+                signature_secretariat = @signature_secretariat
+            WHERE signature_id = @signature_id
+          `);
+        }
+        else {
+            // No record, insert new
+            const insertRequest = new sql.Request(transaction);
+            await insertRequest
+                .input("application_id", sql.Int, data.application_id)
+                .input("staff_id_secretariat", sql.Int, data.staff_id)
+                .input("signature_secretariat", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_secretariat, signature_secretariat)
+            VALUES (@application_id, @staff_id_secretariat, @signature_secretariat)
+          `);
+        }
+        // Update loan status
+        // const statusRequest = new sql.Request(transaction);
+        // await statusRequest
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department", sql.VarChar(50), "HR").query(`
+        //     UPDATE tbl_Department_Status
+        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //     WHERE application_id = @application_id AND department = @department
+        //   `);
+        await transaction.commit();
+        updateLoanStatus("Secretariat", "Approved", data.application_id);
+        res.status(200).json({
+            message: checkResult.recordset.length > 0
+                ? "Signature updated successfully."
+                : "Signature added successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("submitSignatureSecretariat error:", error);
+        res.status(500).json({ message: "Failed to submit Secretariat signature", error });
     }
 });
 // POST METHOD: Submit HR Signature
@@ -971,7 +1097,7 @@ router.post("/loanApplication/submitSignatureHR", async (req, res) => {
         //   .input("status", sql.VarChar(50), "Approved")
         //   .input("application_id", sql.Int, data.application_id)
         //   .input("department", sql.VarChar(50), "HR").query(`
-        //     UPDATE tbl_department_status
+        //     UPDATE tbl_Department_Status
         //     SET status = @status, updated_at = CURRENT_TIMESTAMP
         //     WHERE application_id = @application_id AND department = @department
         //   `);
@@ -1034,7 +1160,7 @@ router.post("/loanApplication/submitSignatureAdmin", async (req, res) => {
         //   .input("status", sql.VarChar(50), "Approved")
         //   .input("application_id", sql.Int, data.application_id)
         //   .input("department", sql.VarChar(50), "HR").query(`
-        //     UPDATE tbl_department_status
+        //     UPDATE tbl_Department_Status
         //     SET status = @status, updated_at = CURRENT_TIMESTAMP
         //     WHERE application_id = @application_id AND department = @department
         //   `);
@@ -1227,10 +1353,10 @@ export async function updateLoanStatus(office, status, application_id) {
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         const query = `
-        UPDATE tbl_department_status
+        UPDATE tbl_Department_Status
         SET status = @status,
             updated_at = CURRENT_TIMESTAMP 
-        FROM tbl_department_status AS tas
+        FROM tbl_Department_Status AS tas
         INNER JOIN tbl_department AS toff
         ON tas.department_id = toff.department_id
         WHERE toff.department_name = @office AND tas.application_id = @application_id;
@@ -1385,7 +1511,7 @@ async function updateLoanStatusHistory(initiator, application_id, transaction) {
                 break;
         }
         const query = `
-                INSERT INTO tbl_application_status_history
+                INSERT INTO tbl_Application_Status_History
                 (application_id, remarks, history_date, initiator)
                 VALUES
                 (@application_id, '${remarkMsg}', CURRENT_TIMESTAMP, '${initiator}')
@@ -1584,9 +1710,9 @@ router.post("/addLoanData", upload.fields([
                 (@application_id)
             `;
             await request7.query(sql7);
-            // tbl_department_status
+            // tbl_Department_Status
             const sql8 = `
-            INSERT INTO tbl_department_status
+            INSERT INTO tbl_Department_Status
             (application_id, department_id, status)
             VALUES
             (${application_id}, 1, 'Pending'),
@@ -1630,7 +1756,7 @@ router.patch("/paid", async (req, res) => {
             .input("application_id", sql.Int, application_id)
             .input("department_id", sql.Int, 9)
             .input("status", sql.VarChar(50), "Paid").query(`
-          UPDATE tbl_department_status
+          UPDATE tbl_Department_Status
           SET status = @status, updated_at = CURRENT_TIMESTAMP
           WHERE application_id = @application_id AND department_id = @department_id
         `);
@@ -1665,10 +1791,10 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
             .input("status", sql.VarChar, "Approved")
             .input("office", sql.VarChar, office)
             .input("application_id", sql.Int, application_id).query(`
-                UPDATE tbl_department_status
+                UPDATE tbl_Department_Status
                 SET status = @status,
                     updated_at = CURRENT_TIMESTAMP 
-                FROM tbl_department_status AS tas
+                FROM tbl_Department_Status AS tas
                 INNER JOIN tbl_department AS toff
                 ON tas.department_id = toff.department_id
                 WHERE toff.department_name = @office AND tas.application_id = @application_id;
@@ -1715,7 +1841,7 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
             .input("application_id", sql.Int, application_id)
             .input("remarks", sql.VarChar, remarkMsg)
             .input("initiator", sql.VarChar, office).query(`
-                INSERT INTO tbl_application_status_history (application_id, remarks, history_date, initiator)
+                INSERT INTO tbl_Application_Status_History (application_id, remarks, history_date, initiator)
                 VALUES (@application_id, @remarks, CURRENT_TIMESTAMP, @initiator);
             `);
         if (insertHistoryResult.rowsAffected[0] === 0) {
@@ -1757,10 +1883,10 @@ router.patch("/loanApplication/updateApprovalAccounting", async (req, res) => {
             .input("status", sql.VarChar, "Approved")
             .input("office", sql.VarChar, office)
             .input("application_id", sql.Int, application_id).query(`
-                UPDATE tbl_department_status
+                UPDATE tbl_Department_Status
                 SET status = @status,
                     updated_at = CURRENT_TIMESTAMP 
-                FROM tbl_department_status AS tas
+                FROM tbl_Department_Status AS tas
                 INNER JOIN tbl_department AS toff
                 ON tas.department_id = toff.department_id
                 WHERE toff.department_name = @office AND tas.application_id = @application_id;
@@ -1807,7 +1933,7 @@ router.patch("/loanApplication/updateApprovalAccounting", async (req, res) => {
             .input("application_id", sql.Int, application_id)
             .input("remarks", sql.VarChar, remarkMsg)
             .input("initiator", sql.VarChar, office).query(`
-                INSERT INTO tbl_application_status_history (application_id, remarks, history_date, initiator)
+                INSERT INTO tbl_Application_Status_History (application_id, remarks, history_date, initiator)
                 VALUES (@application_id, @remarks, CURRENT_TIMESTAMP, @initiator);
             `);
         if (insertHistoryResult.rowsAffected[0] === 0) {
