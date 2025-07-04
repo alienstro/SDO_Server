@@ -903,15 +903,15 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
           @monthly_amortization, @period_of_loan, @processed_by, @reviewed_by, @remarks, @application_id
         )
       `);
-        const request2 = new sql.Request(transaction);
-        await request2
-            .input("status", sql.VarChar(50), "Approved")
-            .input("application_id", sql.Int, data.application_id)
-            .input("department_id", sql.Int, data.department_id).query(`
-        UPDATE tbl_Department_Status
-        SET status = @status, updated_at = CURRENT_TIMESTAMP
-        WHERE application_id = @application_id AND department_id = @department_id
-      `);
+        // const request2 = new sql.Request(transaction);
+        // await request2
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department_id", sql.Int, data.department_id).query(`
+        //   UPDATE tbl_Department_Status
+        //   SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //   WHERE application_id = @application_id AND department_id = @department_id
+        // `);
         await transaction.commit();
         res.status(201).json({
             message: "Loan assessment added successfully",
