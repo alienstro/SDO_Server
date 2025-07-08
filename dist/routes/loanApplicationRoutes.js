@@ -1611,17 +1611,18 @@ router.post("/addLoanData", upload.fields([
             request3.input("co_mobile_number", sql.Int, comakerInfoParse.mobileNo);
             request3.input("applicant_id", sql.Int, applicant_id);
             request3.input("application_id", sql.Int, application_id);
+            request3.input("position", sql.VarChar, comakerInfoParse.position);
             const sql3 = `
                 INSERT INTO [tbl_Co_Makers_Information] 
                 ([co_last_name], [co_first_name], [co_middle_initial], [co_region], [co_province], 
                  [co_city], [co_barangay], [co_street], [co_zipcode], [co_employee_number], 
                  [co_employment_status], [co_date_of_birth], [co_age], [co_office], [co_monthly_salary], 
-                 [co_office_tel_number], [co_years_in_service], [co_mobile_number], [applicant_id], [application_id])
+                 [co_office_tel_number], [co_years_in_service], [co_mobile_number], [applicant_id], [application_id], [position])
                 VALUES 
                 (@co_last_name, @co_first_name, @co_middle_initial, @co_region, @co_province, 
                  @co_city, @co_barangay, @co_street, @co_zipcode, @co_employee_number, 
                  @co_employment_status, @co_date_of_birth, @co_age, @co_office, @co_monthly_salary, 
-                 @co_office_tel_number, @co_years_in_service, @co_mobile_number, @applicant_id, @application_id)
+                 @co_office_tel_number, @co_years_in_service, @co_mobile_number, @applicant_id, @application_id, @position)
             `;
             await request3.query(sql3);
             // tbl_Borrowers_Information
@@ -1646,17 +1647,18 @@ router.post("/addLoanData", upload.fields([
             request4.input("mobile_number", sql.Int, borrowerInfoParse.mobileNo);
             request4.input("applicant_id", sql.Int, applicant_id);
             request4.input("application_id", sql.Int, application_id);
+            request4.input("position", sql.VarChar, borrowerInfoParse.position);
             const sql4 = `
                 INSERT INTO [tbl_Borrowers_Information] 
                         ([last_name], [first_name], [middle_initial], [region], [province], 
                          [city], [barangay], [street], [zipcode], [employee_number], 
                          [employment_status], [date_of_birth], [age], [office], [monthly_salary], 
-                         [office_tel_number], [years_in_service], [mobile_number], [applicant_id], [application_id])
+                         [office_tel_number], [years_in_service], [mobile_number], [applicant_id], [application_id], [position])
                     VALUES 
                         (@last_name, @first_name, @middle_initial, @region, @province, 
                          @city, @barangay, @street, @zipcode, @employee_number, 
                          @employment_status, @date_of_birth, @age, @office, @monthly_salary, 
-                         @office_tel_number, @years_in_service, @mobile_number, @applicant_id, @application_id)
+                         @office_tel_number, @years_in_service, @mobile_number, @applicant_id, @application_id, @position)
             `;
             await request4.query(sql4);
             // Save Files
