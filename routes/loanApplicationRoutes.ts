@@ -220,6 +220,7 @@ router.get(
             ld.term,
             ld.loan_application_number,
             ld.purpose,
+            ld.other_purpose,
             ld.borrowers_agreement,
             ld.co_makers_agreement,
             ld.applicant_id,
@@ -1956,13 +1957,14 @@ router.post(
         request2.input("co_makers_agreement", sql.VarChar, "Agreed");
         request2.input("applicant_id", sql.Int, applicant_id);
         request2.input("application_id", sql.Int, application_id);
+        request2.input("other_purpose", sql.NVarChar, loanDetailsParse.otherPurpose)
         const sql2 = `
                 INSERT INTO [tbl_Loan_Details] 
                 ([loan_amount], [type_of_loan], [term], [loan_application_number], 
-                [purpose], [borrowers_agreement], [co_makers_agreement], [applicant_id], [application_id])
+                [purpose], [borrowers_agreement], [co_makers_agreement], [applicant_id], [application_id], [other_purpose])
                 VALUES 
                 (@loan_amount, @type_of_loan, @term, @loan_application_number, 
-                @purpose, @borrowers_agreement, @co_makers_agreement, @applicant_id, @application_id)
+                @purpose, @borrowers_agreement, @co_makers_agreement, @applicant_id, @application_id, @other_purpose)
             `;
         await request2.query(sql2);
 
