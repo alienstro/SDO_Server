@@ -1539,7 +1539,7 @@ router.post("/addLoanData", upload.fields([
     { name: "payslipComaker" },
 ]), async (req, res) => {
     // const { loanDetailsJSON, borrowerInfoJSON, comakerInfoJSON} = req.body;
-    const { loanDetails, borrowerInfo, comakerInfo, applicantId } = req.body;
+    const { loanDetails, borrowerInfo, comakerInfo, applicantId, signature } = req.body;
     // const applicant_id = Number(applicantId);
     try {
         const pool = await connectToDatabase();
@@ -1606,9 +1606,9 @@ router.post("/addLoanData", upload.fields([
             request3.input("co_age", sql.Int, comakerInfoParse.age);
             request3.input("co_office", sql.VarChar, comakerInfoParse.office);
             request3.input("co_monthly_salary", sql.Decimal, comakerInfoParse.salary);
-            request3.input("co_office_tel_number", sql.Int, comakerInfoParse.officeTelNo);
+            request3.input("co_office_tel_number", sql.VarChar, comakerInfoParse.officeTelNo);
             request3.input("co_years_in_service", sql.Int, comakerInfoParse.yearService);
-            request3.input("co_mobile_number", sql.Int, comakerInfoParse.mobileNo);
+            request3.input("co_mobile_number", sql.VarChar, comakerInfoParse.mobileNo);
             request3.input("applicant_id", sql.Int, applicant_id);
             request3.input("application_id", sql.Int, application_id);
             request3.input("position", sql.VarChar, comakerInfoParse.position);
@@ -1642,23 +1642,24 @@ router.post("/addLoanData", upload.fields([
             request4.input("age", sql.Int, borrowerInfoParse.age);
             request4.input("office", sql.VarChar, borrowerInfoParse.office);
             request4.input("monthly_salary", sql.Decimal, borrowerInfoParse.salary);
-            request4.input("office_tel_number", sql.Int, borrowerInfoParse.officeTelNo);
+            request4.input("office_tel_number", sql.VarChar, borrowerInfoParse.officeTelNo);
             request4.input("years_in_service", sql.Int, borrowerInfoParse.yearService);
-            request4.input("mobile_number", sql.Int, borrowerInfoParse.mobileNo);
+            request4.input("mobile_number", sql.VarChar, borrowerInfoParse.mobileNo);
             request4.input("applicant_id", sql.Int, applicant_id);
             request4.input("application_id", sql.Int, application_id);
             request4.input("position", sql.VarChar, borrowerInfoParse.position);
+            request4.input("signature", sql.NVarChar, signature);
             const sql4 = `
                 INSERT INTO [tbl_Borrowers_Information] 
                         ([last_name], [first_name], [middle_initial], [region], [province], 
                          [city], [barangay], [street], [zipcode], [employee_number], 
                          [employment_status], [date_of_birth], [age], [office], [monthly_salary], 
-                         [office_tel_number], [years_in_service], [mobile_number], [applicant_id], [application_id], [position])
+                         [office_tel_number], [years_in_service], [mobile_number], [applicant_id], [application_id], [position], [signature])
                     VALUES 
                         (@last_name, @first_name, @middle_initial, @region, @province, 
                          @city, @barangay, @street, @zipcode, @employee_number, 
                          @employment_status, @date_of_birth, @age, @office, @monthly_salary, 
-                         @office_tel_number, @years_in_service, @mobile_number, @applicant_id, @application_id, @position)
+                         @office_tel_number, @years_in_service, @mobile_number, @applicant_id, @application_id, @position, @signature)
             `;
             await request4.query(sql4);
             // Save Files
