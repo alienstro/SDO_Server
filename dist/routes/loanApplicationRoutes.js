@@ -321,6 +321,7 @@ router.get("/loanApplication/getPaidApplication", async (req, res) => {
 router.get("/loanApplication/allPendingApplications/:applicantId", async (req, res) => {
     try {
         const { applicantId } = req.params;
+        console.log("applicant id: ", applicantId);
         const pool = await connectToDatabase();
         const loanQuery = `
             SELECT * 
@@ -335,7 +336,7 @@ router.get("/loanApplication/allPendingApplications/:applicantId", async (req, r
         if (!loanResult.recordset.length) {
             return res.status(200).json({
                 success: false,
-                message: []
+                message: [],
             });
         }
         const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
@@ -351,12 +352,67 @@ router.get("/loanApplication/allPendingApplications/:applicantId", async (req, r
                 .query(historyQuery);
             return {
                 currentLoan: loan,
-                currentHistory: historyResult.recordset.length > 0 ? historyResult.recordset[0] : null
+                currentHistory: historyResult.recordset.length > 0
+                    ? historyResult.recordset[0]
+                    : null,
             };
         }));
         return res.status(200).json({
             success: true,
-            message: applications
+            message: applications,
+        });
+    }
+    catch (error) {
+        console.error("Error fetching all pending applications:", error);
+        res.status(500).json({
+            message: "Failed to retrieve pending applications: ",
+            error,
+        });
+    }
+});
+// GET METHOD: Fetch all pending applications for co-maker by applicantId
+router.get("/loanApplication/allPendingCoMakerApplication/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        console.log("email: ", email);
+        const pool = await connectToDatabase();
+        const loanQuery = `
+            SELECT * 
+            FROM tbl_Co_Makers_Information 
+            WHERE co_email = @co_email
+            ORDER BY application_id DESC;
+        `;
+        const loanResult = await pool
+            .request()
+            .input("co_email", sql.VarChar, email)
+            .query(loanQuery);
+        if (!loanResult.recordset.length) {
+            return res.status(200).json({
+                success: false,
+                message: [],
+            });
+        }
+        const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+            const historyQuery = `
+              SELECT TOP 1 * 
+              FROM tbl_Application_Status_History
+              WHERE application_id = @application_id
+              ORDER BY history_date DESC;
+          `;
+            const historyResult = await pool
+                .request()
+                .input("application_id", loan.application_id)
+                .query(historyQuery);
+            return {
+                currentLoan: loan,
+                currentHistory: historyResult.recordset.length > 0
+                    ? historyResult.recordset[0]
+                    : null,
+            };
+        }));
+        return res.status(200).json({
+            success: true,
+            message: applications,
         });
     }
     catch (error) {
@@ -379,6 +435,30 @@ router.get("/loanApplication/LoanApplicationStatus/:applicantId", async (req, re
                     JOIN tbl_Department_Status OS
                     ON LA.application_id = OS.application_id
                     WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id;
+            `);
+        res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error("Failed to get loan application status:", error);
+        res.status(500).json({
+            message: "Failed to retrieve loan application status: ",
+            error,
+        });
+    }
+});
+// GET METHOD: Fetch co-maker loanApplicationStatus by application id for
+router.get("/loanApplication/LoanApplicationStatus/:application_id", async (req, res) => {
+    try {
+        const { application_id } = req.params;
+        const pool = await connectToDatabase();
+        const result = await pool
+            .request()
+            .input("application_id", sql.Int, application_id).query(`
+              SELECT * 
+              FROM tbl_Loan_Application LA
+              JOIN tbl_Department_Status OS
+                ON LA.application_id = OS.application_id
+              WHERE LA.status = 'Pending' AND LA.application_id = @application_id;
             `);
         res.status(200).json(result.recordset);
     }
@@ -488,9 +568,7 @@ router.get("/loanApplication/loanApplicationStatus/:applicantId", async (req, re
     }
     catch (error) {
         console.error("Failed to get loan application status:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Failed to retrieve loan application status: ",
             error,
         });
@@ -987,7 +1065,9 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
     }
     catch (error) {
         console.error("submitSignatureAccounting error:", error);
-        res.status(500).json({ message: "Failed to submit Accounting signature", error });
+        res
+            .status(500)
+            .json({ message: "Failed to submit Accounting signature", error });
     }
 });
 // POST METHOD: Submit Secretariat Signature
@@ -1050,7 +1130,9 @@ router.post("/loanApplication/submitSignatureSecretariat", async (req, res) => {
     }
     catch (error) {
         console.error("submitSignatureSecretariat error:", error);
-        res.status(500).json({ message: "Failed to submit Secretariat signature", error });
+        res
+            .status(500)
+            .json({ message: "Failed to submit Secretariat signature", error });
     }
 });
 // POST METHOD: Submit HR Signature
@@ -1528,7 +1610,7 @@ async function updateLoanStatusHistory(initiator, application_id, transaction) {
 import multer from "multer";
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-// POST METHOD: Add Loan Application
+// POST METHOD: Add Loan Application with the EMAIL OF CO-MAKER ONLY
 router.post("/addLoanData", upload.fields([
     { name: "csc" },
     { name: "emergency" },
@@ -1590,39 +1672,77 @@ router.post("/addLoanData", upload.fields([
             `;
             await request2.query(sql2);
             // tbl_Co_Makers_Information
+            // const request3 = new sql.Request(transaction);
+            // request3.input("co_last_name", sql.VarChar, comakerInfoParse.lastName);
+            // request3.input(
+            //   "co_first_name",
+            //   sql.VarChar,
+            //   comakerInfoParse.firstname
+            // );
+            // request3.input(
+            //   "co_middle_initial",
+            //   sql.VarChar,
+            //   comakerInfoParse.middleName
+            // );
+            // request3.input("co_region", sql.VarChar, comakerInfoParse.region);
+            // request3.input("co_province", sql.VarChar, comakerInfoParse.province);
+            // request3.input("co_city", sql.VarChar, comakerInfoParse.city);
+            // request3.input("co_barangay", sql.VarChar, comakerInfoParse.barangay);
+            // request3.input("co_street", sql.VarChar, comakerInfoParse.street);
+            // request3.input("co_zipcode", sql.VarChar, comakerInfoParse.zipcode);
+            // request3.input(
+            //   "co_employee_number",
+            //   sql.Int,
+            //   comakerInfoParse.employeeNo
+            // );
+            // request3.input(
+            //   "co_employment_status",
+            //   sql.VarChar,
+            //   comakerInfoParse.employeeStatus
+            // );
+            // request3.input("co_date_of_birth", sql.Date, comakerInfoParse.birth);
+            // request3.input("co_age", sql.Int, comakerInfoParse.age);
+            // request3.input("co_office", sql.VarChar, comakerInfoParse.office);
+            // request3.input(
+            //   "co_monthly_salary",
+            //   sql.Decimal,
+            //   comakerInfoParse.salary
+            // );
+            // request3.input(
+            //   "co_office_tel_number",
+            //   sql.VarChar,
+            //   comakerInfoParse.officeTelNo
+            // );
+            // request3.input(
+            //   "co_years_in_service",
+            //   sql.Int,
+            //   comakerInfoParse.yearService
+            // );
+            // request3.input("co_mobile_number", sql.VarChar, comakerInfoParse.mobileNo);
+            // request3.input("applicant_id", sql.Int, applicant_id);
+            // request3.input("application_id", sql.Int, application_id);
+            // request3.input("position", sql.VarChar, comakerInfoParse.position);
+            // const sql3 = `
+            //         INSERT INTO [tbl_Co_Makers_Information]
+            //         ([co_last_name], [co_first_name], [co_middle_initial], [co_region], [co_province],
+            //          [co_city], [co_barangay], [co_street], [co_zipcode], [co_employee_number],
+            //          [co_employment_status], [co_date_of_birth], [co_age], [co_office], [co_monthly_salary],
+            //          [co_office_tel_number], [co_years_in_service], [co_mobile_number], [applicant_id], [application_id], [position])
+            //         VALUES
+            //         (@co_last_name, @co_first_name, @co_middle_initial, @co_region, @co_province,
+            //          @co_city, @co_barangay, @co_street, @co_zipcode, @co_employee_number,
+            //          @co_employment_status, @co_date_of_birth, @co_age, @co_office, @co_monthly_salary,
+            //          @co_office_tel_number, @co_years_in_service, @co_mobile_number, @applicant_id, @application_id, @position)
+            //     `;
+            // await request3.query(sql3);
             const request3 = new sql.Request(transaction);
-            request3.input("co_last_name", sql.VarChar, comakerInfoParse.lastName);
-            request3.input("co_first_name", sql.VarChar, comakerInfoParse.firstname);
-            request3.input("co_middle_initial", sql.VarChar, comakerInfoParse.middleName);
-            request3.input("co_region", sql.VarChar, comakerInfoParse.region);
-            request3.input("co_province", sql.VarChar, comakerInfoParse.province);
-            request3.input("co_city", sql.VarChar, comakerInfoParse.city);
-            request3.input("co_barangay", sql.VarChar, comakerInfoParse.barangay);
-            request3.input("co_street", sql.VarChar, comakerInfoParse.street);
-            request3.input("co_zipcode", sql.VarChar, comakerInfoParse.zipcode);
-            request3.input("co_employee_number", sql.Int, comakerInfoParse.employeeNo);
-            request3.input("co_employment_status", sql.VarChar, comakerInfoParse.employeeStatus);
-            request3.input("co_date_of_birth", sql.Date, comakerInfoParse.birth);
-            request3.input("co_age", sql.Int, comakerInfoParse.age);
-            request3.input("co_office", sql.VarChar, comakerInfoParse.office);
-            request3.input("co_monthly_salary", sql.Decimal, comakerInfoParse.salary);
-            request3.input("co_office_tel_number", sql.VarChar, comakerInfoParse.officeTelNo);
-            request3.input("co_years_in_service", sql.Int, comakerInfoParse.yearService);
-            request3.input("co_mobile_number", sql.VarChar, comakerInfoParse.mobileNo);
-            request3.input("applicant_id", sql.Int, applicant_id);
+            request3.input("co_email", sql.VarChar, comakerInfoParse.email);
             request3.input("application_id", sql.Int, application_id);
-            request3.input("position", sql.VarChar, comakerInfoParse.position);
             const sql3 = `
                 INSERT INTO [tbl_Co_Makers_Information] 
-                ([co_last_name], [co_first_name], [co_middle_initial], [co_region], [co_province], 
-                 [co_city], [co_barangay], [co_street], [co_zipcode], [co_employee_number], 
-                 [co_employment_status], [co_date_of_birth], [co_age], [co_office], [co_monthly_salary], 
-                 [co_office_tel_number], [co_years_in_service], [co_mobile_number], [applicant_id], [application_id], [position])
+                ([co_email], [application_id])
                 VALUES 
-                (@co_last_name, @co_first_name, @co_middle_initial, @co_region, @co_province, 
-                 @co_city, @co_barangay, @co_street, @co_zipcode, @co_employee_number, 
-                 @co_employment_status, @co_date_of_birth, @co_age, @co_office, @co_monthly_salary, 
-                 @co_office_tel_number, @co_years_in_service, @co_mobile_number, @applicant_id, @application_id, @position)
+                (@co_email, @application_id)
             `;
             await request3.query(sql3);
             // tbl_Borrowers_Information
