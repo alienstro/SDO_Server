@@ -393,6 +393,24 @@ router.get("/loanApplication/allPendingCoMakerApplication/:email", async (req, r
             });
         }
         const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+            const loanApplicationQuery = `
+          SELECT 
+            application_id, 
+            applicant_id, 
+            application_date, 
+            amount, 
+            loan_type, 
+            is_approved_osds, 
+            is_approved_accounting, 
+            is_qualified, 
+            status
+          FROM tbl_Loan_Application
+          WHERE application_id = @application_id;
+          `;
+            const loanApplicationResult = await pool
+                .request()
+                .input("application_id", loan.application_id)
+                .query(loanApplicationQuery);
             const historyQuery = `
               SELECT TOP 1 * 
               FROM tbl_Application_Status_History
@@ -404,7 +422,7 @@ router.get("/loanApplication/allPendingCoMakerApplication/:email", async (req, r
                 .input("application_id", loan.application_id)
                 .query(historyQuery);
             return {
-                currentLoan: loan,
+                currentLoan: loanApplicationResult.recordset[0],
                 currentHistory: historyResult.recordset.length > 0
                     ? historyResult.recordset[0]
                     : null,
@@ -446,21 +464,46 @@ router.get("/loanApplication/LoanApplicationStatus/:applicantId", async (req, re
         });
     }
 });
-// GET METHOD: Fetch co-maker loanApplicationStatus by application id for
-router.get("/loanApplication/LoanApplicationStatus/:application_id", async (req, res) => {
+// GET METHOD: Fetch co-maker loanApplicationStatus by application id for CoMaker
+router.get("/loanApplication/LoanApplicationStatusCoMaker/:email", async (req, res) => {
     try {
-        const { application_id } = req.params;
+        const { email } = req.params;
         const pool = await connectToDatabase();
-        const result = await pool
+        const loanQuery = `
+            SELECT * 
+            FROM tbl_Co_Makers_Information 
+            WHERE co_email = @co_email
+            ORDER BY application_id DESC;
+        `;
+        const loanResult = await pool
             .request()
-            .input("application_id", sql.Int, application_id).query(`
-              SELECT * 
-              FROM tbl_Loan_Application LA
-              JOIN tbl_Department_Status OS
-                ON LA.application_id = OS.application_id
-              WHERE LA.status = 'Pending' AND LA.application_id = @application_id;
-            `);
-        res.status(200).json(result.recordset);
+            .input("co_email", sql.VarChar, email)
+            .query(loanQuery);
+        if (!loanResult.recordset.length) {
+            return res.status(200).json({
+                success: false,
+                message: [],
+            });
+        }
+        const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+            const historyQuery = `
+                SELECT * FROM tbl_Loan_Application LA
+                    JOIN tbl_Department_Status OS
+                    ON LA.application_id = OS.application_id
+                    WHERE LA.status = 'Pending' AND LA.application_id = @application_id;
+          `;
+            const historyResult = await pool
+                .request()
+                .input("application_id", loan.application_id)
+                .query(historyQuery);
+            // res.status(200).json(historyResult.recordset);
+            return historyResult.recordset.length > 0
+                ? historyResult.recordset[0]
+                : null;
+        }));
+        return res.status(200).json({
+            applications
+        });
     }
     catch (error) {
         console.error("Failed to get loan application status:", error);
@@ -522,6 +565,62 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
                     ORDER BY LA.applicant_id DESC;
                     `);
         res.status(200).json(result.recordset);
+    }
+    catch (error) {
+        console.error("Failed to get loan application history:", error);
+        res.status(500).json({
+            message: "Failed to retrieve loan application history: ",
+            error,
+        });
+    }
+});
+// GET METHOD: Fetch officeStatus by email for co-maker
+router.get("/loanApplication/officeStatusCoMaker/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        const pool = await connectToDatabase();
+        const loanQuery = `
+            SELECT * 
+            FROM tbl_Co_Makers_Information 
+            WHERE co_email = @co_email
+            ORDER BY application_id DESC;
+        `;
+        const loanResult = await pool
+            .request()
+            .input("co_email", sql.VarChar, email)
+            .query(loanQuery);
+        if (!loanResult.recordset.length) {
+            return res.status(200).json({
+                success: false,
+                message: [],
+            });
+        }
+        const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+            const historyQuery = `
+                  SELECT 
+                    LA.application_id,
+                    OS.status,
+                    OS.updated_at,
+                    O.department_name,
+                    O.sequence_order
+                    FROM tbl_Loan_Application LA
+                    JOIN tbl_Department_Status OS
+                    ON LA.application_id = OS.application_id
+                    JOIN tbl_Department O
+                    ON OS.department_id = O.department_id 
+                    WHERE LA.status = 'Pending' AND LA.application_id = @application_id
+                    ORDER BY LA.applicant_id DESC;
+          `;
+            const historyResult = await pool
+                .request()
+                .input("application_id", loan.application_id)
+                .query(historyQuery);
+            // res.status(200).json(historyResult.recordset);
+            return historyResult.recordset.length > 0
+                ? historyResult.recordset[0]
+                : null;
+        }));
+        return res.status(200).json(applications);
     }
     catch (error) {
         console.error("Failed to get loan application history:", error);
@@ -646,6 +745,62 @@ router.get("/loanApplication/loanHistory/:applicantId", async (req, res) => {
         res.status(200).json({
             success: true,
             message: result.recordset,
+        });
+    }
+    catch (error) {
+        console.error("Error fetching loan application history:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching loan application history.",
+            error,
+        });
+    }
+});
+// GET METHOD: Fetch loanHistory by loanApplicationId CO-MAKER
+router.get("/loanApplication/loanHistoryCoMaker/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        const pool = await connectToDatabase();
+        const loanQuery = `
+            SELECT * 
+            FROM tbl_Co_Makers_Information 
+            WHERE co_email = @co_email
+            ORDER BY application_id DESC;
+        `;
+        const loanResult = await pool
+            .request()
+            .input("co_email", sql.VarChar, email)
+            .query(loanQuery);
+        if (!loanResult.recordset.length) {
+            return res.status(200).json({
+                success: false,
+                message: [],
+            });
+        }
+        const applications = await Promise.all(loanResult.recordset.map(async (loan) => {
+            // console.log(loan.application_id);
+            const historyQuery = `
+          SELECT 
+              LA.application_id, 
+              LA.application_date, 
+              LA.is_qualified, 
+              LA.amount,
+              LD.loan_application_number
+            FROM tbl_Loan_Application AS LA
+            JOIN tbl_Loan_Details LD ON LA.application_id = LD.application_id
+            WHERE LA.application_id = @application_id;
+          `;
+            const historyResult = await pool
+                .request()
+                .input("application_id", loan.application_id)
+                .query(historyQuery);
+            // res.status(200).json(historyResult.recordset);
+            return historyResult.recordset.length > 0
+                ? historyResult.recordset[0]
+                : null;
+        }));
+        return res.status(200).json({
+            applications
         });
     }
     catch (error) {
