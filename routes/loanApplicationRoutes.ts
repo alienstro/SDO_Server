@@ -457,6 +457,7 @@ router.get(
             is_approved_osds, 
             is_approved_accounting, 
             is_qualified, 
+            is_filled_out,
             status
           FROM tbl_Loan_Application
           WHERE application_id = @application_id;
@@ -531,6 +532,58 @@ router.get(
   }
 );
 
+// GET METHOD: Fetch borrowers information by application_id
+router.get(
+  "/loanApplication/getBorrowersInformation/:application_id",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { application_id } = req.params;
+
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input("application_id", sql.Int, application_id).query(`
+                    SELECT * FROM tbl_Borrowers_Information 
+                    WHERE application_id = @application_id
+            `);
+
+      res.status(200).json(result.recordset[0]);
+    } catch (error) {
+      console.error("Failed to get borrowers information:", error);
+      res.status(500).json({
+        message: "Failed to retrieve borrowers information: ",
+        error,
+      });
+    }
+  }
+);
+
+// GET METHOD: Fetch co-makers information by application_id
+router.get(
+  "/loanApplication/getCoMakersInformation/:application_id",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { application_id } = req.params;
+
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input("application_id", sql.Int, application_id).query(`
+                    SELECT * FROM tbl_Co_Makers_Information
+                    WHERE application_id = @application_id
+            `);
+
+      res.status(200).json(result.recordset[0]);
+    } catch (error) {
+      console.error("Failed to get co-maker information:", error);
+      res.status(500).json({
+        message: "Failed to retrieve co-maker information: ",
+        error,
+      });
+    }
+  }
+);
+
 // GET METHOD: Fetch co-maker loanApplicationStatus by application id for CoMaker
 router.get(
   "/loanApplication/LoanApplicationStatusCoMaker/:email",
@@ -581,7 +634,7 @@ router.get(
       );
 
       return res.status(200).json({
-        applications
+        applications,
       });
     } catch (error) {
       console.error("Failed to get loan application status:", error);
@@ -722,9 +775,7 @@ router.get(
         })
       );
 
-      return res.status(200).json(
-        applications
-      );
+      return res.status(200).json(applications);
     } catch (error) {
       console.error("Failed to get loan application history:", error);
       res.status(500).json({
@@ -942,7 +993,7 @@ router.get(
       );
 
       return res.status(200).json({
-        applications
+        applications,
       });
     } catch (error) {
       console.error("Error fetching loan application history:", error);
@@ -2502,6 +2553,132 @@ router.post(
 
         // Update Loan Status History
         await updateLoanStatusHistory("Applicant", application_id, transaction);
+
+        await transaction.commit();
+        return res
+          .status(201)
+          .json({ success: true, message: "All data added successfully." });
+      } catch (err: any) {
+        await transaction.rollback();
+        console.error(err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+    } catch (error: any) {
+      console.error("Transaction error:", error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// POST METHOD: Add Loan Application FOR CO-MAKER
+router.patch(
+  "/addLoanDataCoMaker",
+  async (req: Request, res: Response): Promise<any> => {
+    // const { loanDetailsJSON, borrowerInfoJSON, comakerInfoJSON} = req.body;
+    const { comakerInfo, applicantId, signature, applicationId } = req.body;
+
+    try {
+      console.log(comakerInfo, applicantId, signature, applicationId);
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      try {
+        const comakerInfoParse = JSON.parse(comakerInfo);
+        const applicant_id = Number(applicantId);
+        const application_id = Number(applicationId);
+
+        // tbl_Co_Makers_Information
+        const request = new sql.Request(transaction);
+        request.input("co_last_name", sql.VarChar, comakerInfoParse.lastName);
+        request.input("co_first_name", sql.VarChar, comakerInfoParse.firstname);
+        request.input(
+          "co_middle_initial",
+          sql.VarChar,
+          comakerInfoParse.middleName
+        );
+        request.input("co_region", sql.VarChar, comakerInfoParse.region);
+        request.input("co_province", sql.VarChar, comakerInfoParse.province);
+        request.input("co_city", sql.VarChar, comakerInfoParse.city);
+        request.input("co_barangay", sql.VarChar, comakerInfoParse.barangay);
+        request.input("co_street", sql.VarChar, comakerInfoParse.street);
+        request.input("co_zipcode", sql.Int, comakerInfoParse.zipcode);
+        request.input(
+          "co_employee_number",
+          sql.Int,
+          comakerInfoParse.employeeNo
+        );
+        request.input(
+          "co_employment_status",
+          sql.VarChar,
+          comakerInfoParse.employeeStatus
+        );
+        request.input("co_date_of_birth", sql.Date, comakerInfoParse.birth);
+        request.input("co_age", sql.Int, comakerInfoParse.age);
+        request.input("co_office", sql.VarChar, comakerInfoParse.office);
+        request.input(
+          "co_monthly_salary",
+          sql.Decimal,
+          comakerInfoParse.salary
+        );
+        request.input(
+          "co_office_tel_number",
+          sql.VarChar,
+          comakerInfoParse.officeTelNo
+        );
+        request.input(
+          "co_years_in_service",
+          sql.Int,
+          comakerInfoParse.yearService
+        );
+        request.input(
+          "co_mobile_number",
+          sql.VarChar,
+          comakerInfoParse.mobileNo
+        );
+        request.input("position", sql.VarChar, comakerInfoParse.position);
+        request.input("co_signature", sql.NVarChar, signature);
+        request.input("application_id", sql.Int, application_id);
+        request.input("applicant_id", sql.Int, applicant_id);
+
+        const sqlUpdate = `
+      UPDATE [tbl_Co_Makers_Information]
+      SET
+        [co_last_name] = @co_last_name,
+        [co_first_name] = @co_first_name,
+        [co_middle_initial] = @co_middle_initial,
+        [co_region] = @co_region,
+        [co_province] = @co_province,
+        [co_city] = @co_city,
+        [co_barangay] = @co_barangay,
+        [co_street] = @co_street,
+        [co_zipcode] = @co_zipcode,
+        [co_employee_number] = @co_employee_number,
+        [co_employment_status] = @co_employment_status,
+        [co_date_of_birth] = @co_date_of_birth,
+        [co_age] = @co_age,
+        [co_office] = @co_office,
+        [co_monthly_salary] = @co_monthly_salary,
+        [co_office_tel_number] = @co_office_tel_number,
+        [co_years_in_service] = @co_years_in_service,
+        [co_mobile_number] = @co_mobile_number,
+        [position] = @position,
+        [co_signature] = @co_signature,
+        [applicant_id] = @applicant_id,
+        [co_date] = GETDATE()
+      WHERE [application_id] = @application_id
+    `;
+
+        await request.query(sqlUpdate);
+
+        const filledOutForm = new sql.Request(transaction);
+        filledOutForm.input("application_id", sql.Int, application_id);
+        filledOutForm.input("is_filled_out", sql.VarChar, "Yes");
+        await filledOutForm.query(`
+          UPDATE [tbl_Loan_Application]
+          SET [is_filled_out] = @is_filled_out
+          WHERE [application_id] = @application_id
+        `);
 
         await transaction.commit();
         return res
