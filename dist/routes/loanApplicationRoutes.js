@@ -10,26 +10,27 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
         const pool = await connectToDatabase();
         const result = await pool.request().query(`
             SELECT 
-            ld.loan_details_id,
-            ld.loan_amount,
-            ld.type_of_loan,
-            ld.term,
-            ld.loan_application_number,
-            ld.purpose,
-            ld.borrowers_agreement,
-            ld.co_makers_agreement,
-            ld.applicant_id,
-            ld.application_id,
-            ld.date_submitted,
-            a.last_name,
-            a.first_name,
-            a.middle_name,
-            la.is_approved_osds
+                ld.loan_details_id,
+                ld.loan_amount,
+                ld.type_of_loan,
+                ld.term,
+                ld.loan_application_number,
+                ld.purpose,
+                ld.borrowers_agreement,
+                ld.co_makers_agreement,
+                ld.applicant_id,
+                ld.application_id,
+                ld.date_submitted,
+                a.last_name,
+                a.first_name,
+                a.middle_name,
+                la.is_approved_osds
             FROM tbl_Loan_Application la
             JOIN tbl_Loan_Details ld
-            ON la.application_id = ld.application_id
+                ON la.application_id = ld.application_id
             JOIN tbl_Applicant a
-            ON la.applicant_id = a.applicant_id;
+                ON la.applicant_id = a.applicant_id
+            WHERE la.is_filled_out = 'Yes';
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
@@ -2163,6 +2164,7 @@ router.patch("/paid", async (req, res) => {
         const pool = await connectToDatabase();
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
+        // Update department 9 status to 'Paid'
         const updateRequest = new sql.Request(transaction);
         await updateRequest
             .input("application_id", sql.Int, application_id)
@@ -2171,6 +2173,15 @@ router.patch("/paid", async (req, res) => {
           UPDATE tbl_Department_Status
           SET status = @status, updated_at = CURRENT_TIMESTAMP
           WHERE application_id = @application_id AND department_id = @department_id
+        `);
+        // Update loan application status to 'Paid'
+        const updateLoanStatusRequest = new sql.Request(transaction);
+        await updateLoanStatusRequest
+            .input("application_id", sql.Int, application_id)
+            .input("status", sql.VarChar(50), "Paid").query(`
+          UPDATE tbl_Loan_Application
+          SET status = @status
+          WHERE application_id = @application_id
         `);
         await transaction.commit();
         res.status(200).json({
