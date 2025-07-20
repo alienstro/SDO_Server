@@ -280,7 +280,7 @@ router.get(
             ON Aps.department_id = O.department_id
             JOIN tbl_Loan_Details LD
             ON LA.application_ID = LD.application_id 
-            WHERE ApS.status = 'Pending'
+            WHERE ApS.status IN ('Pending', 'Rejected')
             )
 
             SELECT application_id, status, department_name, amount, loan_type, application_date, first_name, last_name, applicant_id, purpose
@@ -749,34 +749,28 @@ router.get(
       const applications = await Promise.all(
         loanResult.recordset.map(async (loan) => {
           const historyQuery = `
-                  SELECT 
-                    LA.application_id,
-                    OS.status,
-                    OS.updated_at,
-                    O.department_name,
-                    O.sequence_order
-                    FROM tbl_Loan_Application LA
-                    JOIN tbl_Department_Status OS
-                    ON LA.application_id = OS.application_id
-                    JOIN tbl_Department O
-                    ON OS.department_id = O.department_id 
-                    WHERE LA.status = 'Pending' AND LA.application_id = @application_id
-                    ORDER BY LA.applicant_id DESC;
+            SELECT 
+              LA.application_id,
+              OS.status,
+              OS.updated_at,
+              O.department_name,
+              O.sequence_order
+            FROM tbl_Loan_Application LA
+            JOIN tbl_Department_Status OS ON LA.application_id = OS.application_id
+            JOIN tbl_Department O ON OS.department_id = O.department_id 
+            WHERE LA.status = 'Pending' AND LA.application_id = @application_id
+            ORDER BY LA.applicant_id DESC;
           `;
-
           const historyResult = await pool
             .request()
             .input("application_id", loan.application_id)
             .query(historyQuery);
 
-          // res.status(200).json(historyResult.recordset);
-          return historyResult.recordset.length > 0
-            ? historyResult.recordset[0]
-            : null;
+          return historyResult.recordset;
         })
       );
 
-      return res.status(200).json(applications);
+      return res.status(200).json(applications.flat());
     } catch (error) {
       console.error("Failed to get loan application history:", error);
       res.status(500).json({
@@ -1579,6 +1573,40 @@ router.post(
   }
 );
 
+// POST METHOD: Reject Accounting Application
+router.post(
+  "/loanApplication/rejectAccounting",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    try {
+      // Update department status
+      await updateLoanStatus("Accounting", "Rejected", data.application_id);
+
+      // Update main loan application status to 'Rejected'
+      const pool = await connectToDatabase();
+      await pool
+        .request()
+        .input("application_id", sql.Int, data.application_id)
+        .input("status", sql.VarChar, "Rejected")
+        .input("remarks_message", sql.NVarChar, data.remarks).query(`
+          UPDATE tbl_Loan_Application
+          SET status = @status,
+          remarks_message = @remarks_message
+          WHERE application_id = @application_id
+        `);
+
+      res.status(200).json({
+        message: "Rejected Application successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("rejectAccounting error:", error);
+      res.status(500).json({ message: "Failed to reject application", error });
+    }
+  }
+);
+
 // POST METHOD: Submit Secretariat Signature
 router.post(
   "/loanApplication/submitSignatureSecretariat",
@@ -1654,6 +1682,40 @@ router.post(
       res
         .status(500)
         .json({ message: "Failed to submit Secretariat signature", error });
+    }
+  }
+);
+
+// POST METHOD: Reject Secretariat Application
+router.post(
+  "/loanApplication/rejectSecretariat",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    try {
+      // Update department status
+      await updateLoanStatus("Secretariat", "Rejected", data.application_id);
+
+      // Update main loan application status to 'Rejected'
+      const pool = await connectToDatabase();
+      await pool
+        .request()
+        .input("application_id", sql.Int, data.application_id)
+        .input("status", sql.VarChar, "Rejected")
+        .input("remarks_message", sql.VarChar, data.remarks).query(`
+          UPDATE tbl_Loan_Application
+          SET status = @status,
+          remarks_message = @remarks_message
+          WHERE application_id = @application_id
+        `);
+
+      res.status(200).json({
+        message: "Rejected Application successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("rejectSecretariat error:", error);
+      res.status(500).json({ message: "Failed to reject application", error });
     }
   }
 );
@@ -2110,6 +2172,40 @@ router.post("/users", async (req: Request, res: Response): Promise<any> => {
     res.status(500).json({ message: "Failed to add user", error });
   }
 });
+
+// POST METHOD: Reject application and add remarks_message
+router.post(
+  "/loanApplication/reject",
+  async (req: Request, res: Response): Promise<any> => {
+    const { applicationId, remarks } = req.body;
+
+    try {
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input("application_id", sql.Int, applicationId)
+        .input("remarks_message", sql.VarChar, remarks)
+        .input("status", sql.VarChar, "Reject").query(`
+        UPDATE [tbl_Loan_Application]
+        SET [status] = @status,
+            [remarks_message] = @remarks_message
+        WHERE [application_id] = @application_id
+      `);
+
+      res.status(200).json({
+        success: true,
+        message: "Application rejected and remarks added.",
+      });
+    } catch (error) {
+      console.error("Failed to reject application:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to reject application",
+        error,
+      });
+    }
+  }
+);
 
 import path from "path";
 import fs from "fs";
