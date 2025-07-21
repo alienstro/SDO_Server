@@ -1264,6 +1264,36 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
             .json({ message: "Failed to submit Accounting signature", error });
     }
 });
+// POST METHOD: Reject Admin Application
+router.post("/loanApplication/rejectAdmin", async (req, res) => {
+    const data = req.body;
+    try {
+        // Update department status
+        await updateLoanStatus("Admin", "Rejected", data.application_id);
+        await updateLoanStatus("HR", "Rejected", data.application_id);
+        await updateLoanStatus("Legal", "Rejected", data.application_id);
+        // Update main loan application status to 'Rejected'
+        const pool = await connectToDatabase();
+        await pool
+            .request()
+            .input("application_id", sql.Int, data.application_id)
+            .input("status", sql.VarChar, "Rejected")
+            .input("remarks_message", sql.NVarChar, data.remarks).query(`
+          UPDATE tbl_Loan_Application
+          SET status = @status,
+          remarks_message = @remarks_message
+          WHERE application_id = @application_id
+        `);
+        res.status(200).json({
+            message: "Rejected Application successfully.",
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("rejectAccounting error:", error);
+        res.status(500).json({ message: "Failed to reject application", error });
+    }
+});
 // POST METHOD: Reject Accounting Application
 router.post("/loanApplication/rejectAccounting", async (req, res) => {
     const data = req.body;
