@@ -362,7 +362,7 @@ router.get(
       const loanQuery = `
             SELECT * 
             FROM tbl_Loan_Application 
-            WHERE status = 'Pending' AND applicant_id = @applicant_id
+            WHERE applicant_id = @applicant_id
             ORDER BY application_date DESC;
         `;
 
@@ -459,7 +459,8 @@ router.get(
             is_approved_accounting, 
             is_qualified, 
             is_filled_out,
-            status
+            status,
+            remarks_message
           FROM tbl_Loan_Application
           WHERE application_id = @application_id;
           `;
