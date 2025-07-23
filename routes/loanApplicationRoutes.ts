@@ -260,29 +260,25 @@ router.get(
       const pool = await connectToDatabase();
       const result = await pool.request().query(`
             WITH RankedStatuses AS (
-            SELECT 
-                LA.amount amount,
-                LA.loan_type loan_type,
-                LA.application_date application_date,
-                LA.applicant_id applicant_id,
-                LD.purpose purpose, 
-                APP.first_name first_name,
-                APP.last_name last_name,
-                O.department_name department_name,
-                ApS.*,
-                ROW_NUMBER() OVER (PARTITION BY ApS.application_id ORDER BY O.sequence_order ASC) AS rn
-            FROM tbl_Loan_Application LA
-            JOIN tbl_Applicant APP
-            ON LA.applicant_id = APP.applicant_id
-            JOIN tbl_Department_Status ApS
-            ON LA.application_id = ApS.application_id
-            JOIN tbl_Department O
-            ON Aps.department_id = O.department_id
-            JOIN tbl_Loan_Details LD
-            ON LA.application_ID = LD.application_id 
-            WHERE ApS.status IN ('Pending', 'Rejected')
+                SELECT 
+                    LA.amount amount,
+                    LA.loan_type loan_type,
+                    LA.application_date application_date,
+                    LA.applicant_id applicant_id,
+                    LD.purpose purpose, 
+                    APP.first_name first_name,
+                    APP.last_name last_name,
+                    O.department_name department_name,
+                    ApS.*,
+                    ROW_NUMBER() OVER (PARTITION BY ApS.application_id ORDER BY O.sequence_order ASC) AS rn
+                FROM tbl_Loan_Application LA
+                JOIN tbl_Applicant APP ON LA.applicant_id = APP.applicant_id
+                JOIN tbl_Department_Status ApS ON LA.application_id = ApS.application_id
+                JOIN tbl_Department O ON ApS.department_id = O.department_id
+                JOIN tbl_Loan_Details LD ON LA.application_ID = LD.application_id 
+                WHERE ApS.status IN ('Pending', 'Rejected')
+                  AND LA.is_filled_out = 'Yes'
             )
-
             SELECT application_id, status, department_name, amount, loan_type, application_date, first_name, last_name, applicant_id, purpose
             FROM RankedStatuses
             WHERE rn = 1
@@ -355,7 +351,7 @@ router.get(
     try {
       const { applicantId } = req.params;
 
-      console.log("applicant id: ", applicantId);
+      // console.log("applicant id: ", applicantId);
 
       const pool = await connectToDatabase();
 
@@ -423,7 +419,7 @@ router.get(
     try {
       const { email } = req.params;
 
-      console.log("email: ", email);
+      // console.log("email: ", email);
 
       const pool = await connectToDatabase();
 
@@ -2712,7 +2708,7 @@ router.patch(
     const { comakerInfo, applicantId, signature, applicationId } = req.body;
 
     try {
-      console.log(comakerInfo, applicantId, signature, applicationId);
+      // console.log(comakerInfo, applicantId, signature, applicationId);
       const pool = await connectToDatabase();
       const transaction = new sql.Transaction(pool);
       await transaction.begin();
