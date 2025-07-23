@@ -606,7 +606,7 @@ router.get("/loanApplication/officeStatus/:applicantId", async (req, res) => {
                     ON LA.application_id = OS.application_id
                     JOIN tbl_Department O
                     ON OS.department_id = O.department_id 
-                    WHERE LA.status = 'Pending' AND LA.applicant_id = @applicant_id
+                    WHERE LA.applicant_id = @applicant_id
                     ORDER BY LA.applicant_id DESC;
                     `);
         res.status(200).json(result.recordset);
@@ -651,7 +651,7 @@ router.get("/loanApplication/officeStatusCoMaker/:email", async (req, res) => {
             FROM tbl_Loan_Application LA
             JOIN tbl_Department_Status OS ON LA.application_id = OS.application_id
             JOIN tbl_Department O ON OS.department_id = O.department_id 
-            WHERE LA.status = 'Pending' AND LA.application_id = @application_id
+            WHERE LA.application_id = @application_id
             ORDER BY LA.applicant_id DESC;
           `;
             const historyResult = await pool
