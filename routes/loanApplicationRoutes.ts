@@ -159,7 +159,7 @@ router.get(
                     WHERE la.department_id = @departmentId AND la.application_id IN (
                     SELECT application_id
                     FROM tbl_Department_Status
-                    WHERE department_id = 3 AND status = 'Approved');
+                    WHERE department_id = 1 AND status = 'Approved');
         `);
 
       if (result.recordset.length > 0) {
@@ -1436,8 +1436,8 @@ router.post(
           data.monthlyAmortization
         )
         .input("period_of_loan", sql.Int, data.periodOfLoan)
-        .input("processed_by", sql.VarChar(50), data.processedBy)
-        .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
+        // .input("processed_by", sql.VarChar(50), data.processedBy)
+        // .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
         .input("remarks", sql.VarChar(250), data.remarks ?? null)
         .input("application_id", sql.Int, data.application_id).query(`
         INSERT INTO tbl_Assessment_Form (
@@ -1450,7 +1450,7 @@ router.post(
           number_of_years_past_due, number_of_months_past_due, borrowers_take_home_pay,
           paid_30_percent, percentage_of_principal_paid, principal_loan_amount,
           principal, interest, net_proceeds, net_take_home_pay_after_deduction,
-          monthly_amortization, period_of_loan, processed_by, reviewed_by, remarks, application_id
+          monthly_amortization, period_of_loan, remarks, application_id
         ) VALUES (
           @loan_application_form, @authorization_to_deduct, @latest_pay_slip,
           @photocopy_deped_id, @approved_appointment, @proof_co_terminus, @others,
@@ -1461,7 +1461,7 @@ router.post(
           @number_of_years_past_due, @number_of_months_past_due, @borrowers_take_home_pay,
           @paid_30_percent, @percentage_of_principal_paid, @principal_loan_amount,
           @principal, @interest, @net_proceeds, @net_take_home_pay_after_deduction,
-          @monthly_amortization, @period_of_loan, @processed_by, @reviewed_by, @remarks, @application_id
+          @monthly_amortization, @period_of_loan, @remarks, @application_id
         )
       `);
 
