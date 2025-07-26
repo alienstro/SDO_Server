@@ -11,9 +11,38 @@ router.get(
   "/loanApplication/loanDetails",
   async (req: Request, res: Response): Promise<any> => {
     try {
+       const departmentId = parseInt(req.params.departmentId);
+
       const pool = await connectToDatabase();
-      const result = await pool.request().query(`
-            SELECT 
+      // const result = await pool.request().query(`
+      //       SELECT
+      //           ld.loan_details_id,
+      //           ld.loan_amount,
+      //           ld.type_of_loan,
+      //           ld.term,
+      //           ld.loan_application_number,
+      //           ld.purpose,
+      //           ld.borrowers_agreement,
+      //           ld.co_makers_agreement,
+      //           ld.applicant_id,
+      //           ld.application_id,
+      //           ld.date_submitted,
+      //           a.last_name,
+      //           a.first_name,
+      //           a.middle_name,
+      //           la.is_approved_osds
+      //       FROM tbl_Loan_Application la
+      //       JOIN tbl_Loan_Details ld
+      //           ON la.application_id = ld.application_id
+      //       JOIN tbl_Applicant a
+      //           ON la.applicant_id = a.applicant_id
+      //       WHERE la.is_filled_out = 'Yes';
+      //   `);
+      console.log(departmentId)
+
+      const result = await pool.request().input("departmentId", departmentId)
+      .query(`
+           SELECT 
                 ld.loan_details_id,
                 ld.loan_amount,
                 ld.type_of_loan,
@@ -28,13 +57,17 @@ router.get(
                 a.last_name,
                 a.first_name,
                 a.middle_name,
-                la.is_approved_osds
-            FROM tbl_Loan_Application la
-            JOIN tbl_Loan_Details ld
-                ON la.application_id = ld.application_id
-            JOIN tbl_Applicant a
-                ON la.applicant_id = a.applicant_id
-            WHERE la.is_filled_out = 'Yes';
+                la.department_id,
+                la.status
+                    FROM tbl_Department_Status la
+                    JOIN tbl_Loan_Details ld
+                        ON la.application_id = ld.application_id
+                    JOIN tbl_Applicant a
+                        ON ld.applicant_id = a.applicant_id
+                    WHERE la.department_id = 8 AND la.application_id IN (
+                    SELECT application_id
+                    FROM tbl_Department_Status
+                    WHERE department_id IN (6, 7) AND status = 'Approved');
         `);
 
       if (result.recordset.length > 0) {
@@ -120,7 +153,7 @@ router.get(
   }
 );
 
-// GET METHOD: Fetch loanDetails for Signature by Id
+// GET METHOD: Fetch loanDetails for Signature by Id FOR SIGNATURE PAGE
 router.get(
   "/loanApplication/getLoanDetailsSignature/:departmentId",
   async (req: Request, res: Response): Promise<any> => {
@@ -176,6 +209,62 @@ router.get(
   }
 );
 
+// GET METHOD: Fetch loanDetails for Signature by Id FOR APPROVAL PAGE
+router.get(
+  "/loanApplication/getLoanDetailsApproval/:departmentId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const departmentId = parseInt(req.params.departmentId);
+
+      // if (departmentId !== 4) {
+      //   return res.status(400).json({ message: "Invalid DepartmentId" });
+      // }
+
+      const pool = await connectToDatabase();
+      const result = await pool.request().input("departmentId", departmentId)
+        .query(`
+           SELECT 
+                ld.loan_details_id,
+                ld.loan_amount,
+                ld.type_of_loan,
+                ld.term,
+                ld.loan_application_number,
+                ld.purpose,
+                ld.borrowers_agreement,
+                ld.co_makers_agreement,
+                ld.applicant_id,
+                ld.application_id,
+                ld.date_submitted,
+                a.last_name,
+                a.first_name,
+                a.middle_name,
+                la.department_id,
+                la.status
+                    FROM tbl_Department_Status la
+                    JOIN tbl_Loan_Details ld
+                        ON la.application_id = ld.application_id
+                    JOIN tbl_Applicant a
+                        ON ld.applicant_id = a.applicant_id
+                    WHERE la.department_id = @departmentId AND la.application_id IN (
+                    SELECT application_id
+                    FROM tbl_Department_Status
+                    WHERE department_id = 5 AND status = 'Approved');
+        `);
+
+      if (result.recordset.length > 0) {
+        res.status(200).json(result.recordset);
+      } else {
+        res.status(404).json({
+          message: "No loan details found for the given applicationId",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching loan details:", error);
+      res.status(500).json({ message: "Internal server error", error });
+    }
+  }
+);
+
 // GET METHOD: Fetch Approval Details
 router.get(
   "/loanApplication/getApprovalDetails",
@@ -183,7 +272,7 @@ router.get(
     try {
       const pool = await connectToDatabase();
       const result = await pool.request().query(`
-        SELECT * FROM [sdo_accounting].[dbo].[tbl_Approval]
+        SELECT * FROM [tbl_Signature]; 
         `);
 
       if (result.recordset.length > 0) {
@@ -1826,6 +1915,164 @@ router.post(
     } catch (error) {
       console.error("submitSignatureHR error:", error);
       res.status(500).json({ message: "Failed to submit HR signature", error });
+    }
+  }
+);
+
+// POST METHOD: Submit ASDS Signature
+router.post(
+  "/loanApplication/submitSignatureASDS",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    // console.log(data);
+
+    try {
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      const checkRequest = new sql.Request(transaction);
+      const checkResult = await checkRequest
+        .input("application_id", sql.Int, data.application_id)
+        .query(
+          `SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`
+        );
+
+      if (checkResult.recordset.length > 0) {
+        // If exists, update
+        const signatureId = checkResult.recordset[0].signature_id;
+
+        const updateRequest = new sql.Request(transaction);
+        await updateRequest
+          .input("application_id", sql.Int, data.application_id)
+          .input("staff_id_asds", sql.Int, data.staff_id)
+          .input("signature_asds", sql.NVarChar, data.signature)
+          .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_asds = @staff_id_asds,
+                signature_asds = @signature_asds
+            WHERE signature_id = @signature_id
+          `);
+      } else {
+        // No record, insert new
+        const insertRequest = new sql.Request(transaction);
+        await insertRequest
+          .input("application_id", sql.Int, data.application_id)
+          .input("staff_id_asds", sql.Int, data.staff_id)
+          .input("signature_asds", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_asds, signature_asds)
+            VALUES (@application_id, @staff_id_asds, @signature_asds)
+          `);
+      }
+
+      // Update loan status
+      // const statusRequest = new sql.Request(transaction);
+      // await statusRequest
+      //   .input("status", sql.VarChar(50), "Approved")
+      //   .input("application_id", sql.Int, data.application_id)
+      //   .input("department", sql.VarChar(50), "HR").query(`
+      //     UPDATE tbl_Department_Status
+      //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+      //     WHERE application_id = @application_id AND department = @department
+      //   `);
+
+      await transaction.commit();
+
+      updateLoanStatus("ASDS", "Approved", data.application_id);
+
+      res.status(200).json({
+        message:
+          checkResult.recordset.length > 0
+            ? "Signature updated successfully."
+            : "Signature added successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("submitSignatureASDS error:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to submit ASDS signature", error });
+    }
+  }
+);
+
+// POST METHOD: Submit SDS Signature
+router.post(
+  "/loanApplication/submitSignatureSDS",
+  async (req: Request, res: Response): Promise<any> => {
+    const data = req.body;
+
+    // console.log(data);
+
+    try {
+      const pool = await connectToDatabase();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      const checkRequest = new sql.Request(transaction);
+      const checkResult = await checkRequest
+        .input("application_id", sql.Int, data.application_id)
+        .query(
+          `SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`
+        );
+
+      if (checkResult.recordset.length > 0) {
+        // If exists, update
+        const signatureId = checkResult.recordset[0].signature_id;
+
+        const updateRequest = new sql.Request(transaction);
+        await updateRequest
+          .input("application_id", sql.Int, data.application_id)
+          .input("staff_id_sds", sql.Int, data.staff_id)
+          .input("signature_sds", sql.NVarChar, data.signature)
+          .input("signature_id", sql.Int, signatureId).query(`
+            UPDATE tbl_Signature
+            SET application_id = @application_id,
+                staff_id_sds = @staff_id_sds,
+                signature_sds = @signature_sds
+            WHERE signature_id = @signature_id
+          `);
+      } else {
+        // No record, insert new
+        const insertRequest = new sql.Request(transaction);
+        await insertRequest
+          .input("application_id", sql.Int, data.application_id)
+          .input("staff_id_sds", sql.Int, data.staff_id)
+          .input("signature_sds", sql.NVarChar, data.signature).query(`
+            INSERT INTO tbl_Signature (application_id, staff_id_sds, signature_sds)
+            VALUES (@application_id, @staff_id_sds, @signature_sds)
+          `);
+      }
+
+      // Update loan status
+      // const statusRequest = new sql.Request(transaction);
+      // await statusRequest
+      //   .input("status", sql.VarChar(50), "Approved")
+      //   .input("application_id", sql.Int, data.application_id)
+      //   .input("department", sql.VarChar(50), "HR").query(`
+      //     UPDATE tbl_Department_Status
+      //     SET status = @status, updated_at = CURRENT_TIMESTAMP
+      //     WHERE application_id = @application_id AND department = @department
+      //   `);
+
+      await transaction.commit();
+
+      updateLoanStatus("SDS", "Approved", data.application_id);
+
+      res.status(200).json({
+        message:
+          checkResult.recordset.length > 0
+            ? "Signature updated successfully."
+            : "Signature added successfully.",
+        success: true,
+      });
+    } catch (error) {
+      console.error("submitSignatureSDS error:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to submit SDS signature", error });
     }
   }
 );
