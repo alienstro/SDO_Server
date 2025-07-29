@@ -95,6 +95,71 @@ router.get("/loanApplication/getSignatureDetails", async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
+// GET METHOD: Fetch loanDetails for Signature by Application Id
+router.get("/loanApplication/getSignatureDetailsApplicationId/:application_id", async (req, res) => {
+    try {
+        const applicationId = parseInt(req.params.application_id);
+        const pool = await connectToDatabase();
+        const result = await pool.request().input("application_id", applicationId)
+            .query(`
+          SELECT s.*,
+            sa.first_name AS accounting_first_name,
+            sa.middle_name AS accounting_middle_name,
+            sa.last_name AS accounting_last_name,
+            sa.ext_name AS accounting_ext_name,
+            sa.designation AS accounting_designation,
+            ss.first_name AS secretariat_first_name,
+            ss.middle_name AS secretariat_middle_name,
+            ss.last_name AS secretariat_last_name,
+            ss.ext_name AS secretariat_ext_name,
+            ss.designation AS secretariat_designation,
+            sh.first_name AS hr_first_name,
+            sh.middle_name AS hr_middle_name,
+            sh.last_name AS hr_last_name,
+            sh.ext_name AS hr_ext_name,
+            sh.designation AS hr_designation,
+            sad.first_name AS admin_first_name,
+            sad.middle_name AS admin_middle_name,
+            sad.last_name AS admin_last_name,
+            sad.ext_name AS admin_ext_name,
+            sad.designation AS admin_designation,
+            sl.first_name AS legal_first_name,
+            sl.middle_name AS legal_middle_name,
+            sl.last_name AS legal_last_name,
+            sl.ext_name AS legal_ext_name,
+            sl.designation AS legal_designation,
+            sasds.first_name AS asds_first_name,
+            sasds.middle_name AS asds_middle_name,
+            sasds.last_name AS asds_last_name,
+            sasds.ext_name AS asds_ext_name,
+            sasds.designation AS asds_designation,
+            ssds.first_name AS sds_first_name,
+            ssds.middle_name AS sds_middle_name,
+            ssds.last_name AS sds_last_name,
+            ssds.ext_name AS sds_ext_name,
+            ssds.designation AS sds_designation
+          FROM [tbl_Signature] s
+          LEFT JOIN [tbl_Staff] sa ON s.staff_id_accounting = sa.staff_id
+          LEFT JOIN [tbl_Staff] ss ON s.staff_id_secretariat = ss.staff_id
+          LEFT JOIN [tbl_Staff] sh ON s.staff_id_hr = sh.staff_id
+          LEFT JOIN [tbl_Staff] sad ON s.staff_id_admin = sad.staff_id
+          LEFT JOIN [tbl_Staff] sl ON s.staff_id_legal = sl.staff_id
+          LEFT JOIN [tbl_Staff] sasds ON s.staff_id_asds = sasds.staff_id
+          LEFT JOIN [tbl_Staff] ssds ON s.staff_id_sds = ssds.staff_id
+          WHERE s.application_id = @application_id;
+        `);
+        if (result.recordset.length > 0) {
+            res.status(200).json(result.recordset);
+        }
+        else {
+            res.status(404).json({ message: "No Loan Details found" });
+        }
+    }
+    catch (error) {
+        console.error("Failed to retrieve users:", error);
+        res.status(500).json({ message: "Failed to retrieve users", error });
+    }
+});
 // GET METHOD: Fetch loanDetails for Secretariat
 router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
     try {
@@ -1302,7 +1367,8 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_accounting = @staff_id_accounting,
-                signature_accounting = @signature_accounting
+                signature_accounting = @signature_accounting,
+                accounting_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1425,7 +1491,8 @@ router.post("/loanApplication/submitSignatureSecretariat", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_secretariat = @staff_id_secretariat,
-                signature_secretariat = @signature_secretariat
+                signature_secretariat = @signature_secretariat,
+                secretariat_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1518,7 +1585,8 @@ router.post("/loanApplication/submitSignatureHR", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_hr = @staff_id_hr,
-                signature_hr = @signature_hr
+                signature_hr = @signature_hr,
+                hr_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1581,7 +1649,8 @@ router.post("/loanApplication/submitSignatureASDS", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_asds = @staff_id_asds,
-                signature_asds = @signature_asds
+                signature_asds = @signature_asds,
+                asds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1646,7 +1715,8 @@ router.post("/loanApplication/submitSignatureSDS", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_sds = @staff_id_sds,
-                signature_sds = @signature_sds
+                signature_sds = @signature_sds,
+                asds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1711,7 +1781,8 @@ router.post("/loanApplication/submitSignatureAdmin", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_admin = @staff_id_admin,
-                signature_admin = @signature_admin
+                signature_admin = @signature_admin,
+                admin_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
@@ -1776,7 +1847,8 @@ router.post("/loanApplication/submitSignatureLegal", async (req, res) => {
             UPDATE tbl_Signature
             SET application_id = @application_id,
                 staff_id_legal = @staff_id_legal,
-                signature_legal = @signature_legal
+                signature_legal = @signature_legal,
+                legal_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
