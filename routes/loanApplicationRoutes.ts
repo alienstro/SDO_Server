@@ -11,7 +11,7 @@ router.get(
   "/loanApplication/loanDetails",
   async (req: Request, res: Response): Promise<any> => {
     try {
-       const departmentId = parseInt(req.params.departmentId);
+      const departmentId = parseInt(req.params.departmentId);
 
       const pool = await connectToDatabase();
       // const result = await pool.request().query(`
@@ -38,10 +38,10 @@ router.get(
       //           ON la.applicant_id = a.applicant_id
       //       WHERE la.is_filled_out = 'Yes';
       //   `);
-      console.log(departmentId)
+      console.log(departmentId);
 
       const result = await pool.request().input("departmentId", departmentId)
-      .query(`
+        .query(`
            SELECT 
                 ld.loan_details_id,
                 ld.loan_amount,
@@ -87,8 +87,6 @@ router.get(
   "/loanApplication/getSignatureDetails",
   async (req: Request, res: Response): Promise<any> => {
     try {
-       
-
       const pool = await connectToDatabase();
       const result = await pool.request().query(`
             SELECT * 
@@ -112,11 +110,11 @@ router.get(
   "/loanApplication/getSignatureDetailsApplicationId/:application_id",
   async (req: Request, res: Response): Promise<any> => {
     try {
-       const applicationId = parseInt(req.params.application_id);
+      const applicationId = parseInt(req.params.application_id);
 
       const pool = await connectToDatabase();
       const result = await pool.request().input("application_id", applicationId)
-      .query(`
+        .query(`
           SELECT s.*,
             sa.first_name AS accounting_first_name,
             sa.middle_name AS accounting_middle_name,
@@ -2107,7 +2105,7 @@ router.post(
             SET application_id = @application_id,
                 staff_id_sds = @staff_id_sds,
                 signature_sds = @signature_sds,
-                asds_date = GETDATE()
+                sds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
       } else {
