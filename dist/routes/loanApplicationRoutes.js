@@ -1716,7 +1716,7 @@ router.post("/loanApplication/submitSignatureSDS", async (req, res) => {
             SET application_id = @application_id,
                 staff_id_sds = @staff_id_sds,
                 signature_sds = @signature_sds,
-                asds_date = GETDATE()
+                sds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
         }
