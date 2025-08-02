@@ -108,11 +108,6 @@ router.get("/loanApplication/getSignatureDetailsApplicationId/:application_id", 
             sa.last_name AS accounting_last_name,
             sa.ext_name AS accounting_ext_name,
             sa.designation AS accounting_designation,
-            ss.first_name AS secretariat_first_name,
-            ss.middle_name AS secretariat_middle_name,
-            ss.last_name AS secretariat_last_name,
-            ss.ext_name AS secretariat_ext_name,
-            ss.designation AS secretariat_designation,
             sh.first_name AS hr_first_name,
             sh.middle_name AS hr_middle_name,
             sh.last_name AS hr_last_name,
@@ -140,58 +135,12 @@ router.get("/loanApplication/getSignatureDetailsApplicationId/:application_id", 
             ssds.designation AS sds_designation
           FROM [tbl_Signature] s
           LEFT JOIN [tbl_Staff] sa ON s.staff_id_accounting = sa.staff_id
-          LEFT JOIN [tbl_Staff] ss ON s.staff_id_secretariat = ss.staff_id
           LEFT JOIN [tbl_Staff] sh ON s.staff_id_hr = sh.staff_id
           LEFT JOIN [tbl_Staff] sad ON s.staff_id_admin = sad.staff_id
           LEFT JOIN [tbl_Staff] sl ON s.staff_id_legal = sl.staff_id
           LEFT JOIN [tbl_Staff] sasds ON s.staff_id_asds = sasds.staff_id
           LEFT JOIN [tbl_Staff] ssds ON s.staff_id_sds = ssds.staff_id
           WHERE s.application_id = @application_id;
-        `);
-        if (result.recordset.length > 0) {
-            res.status(200).json(result.recordset);
-        }
-        else {
-            res.status(404).json({ message: "No Loan Details found" });
-        }
-    }
-    catch (error) {
-        console.error("Failed to retrieve users:", error);
-        res.status(500).json({ message: "Failed to retrieve users", error });
-    }
-});
-// GET METHOD: Fetch loanDetails for Secretariat
-router.get("/loanApplication/loanDetailsSecretariat", async (req, res) => {
-    try {
-        const pool = await connectToDatabase();
-        const result = await pool.request().query(`
-            SELECT 
-                ld.loan_details_id,
-                ld.loan_amount,
-                ld.type_of_loan,
-                ld.term,
-                ld.loan_application_number,
-                ld.purpose,
-                ld.borrowers_agreement,
-                ld.co_makers_agreement,
-                ld.applicant_id,
-                ld.application_id,
-                ld.date_submitted,
-                a.last_name,
-                a.first_name,
-                a.middle_name,
-                la.department_id,
-                la.status
-                    FROM tbl_Department_Status la
-                    JOIN tbl_Loan_Details ld
-                        ON la.application_id = ld.application_id
-                    JOIN tbl_Applicant a
-                        ON ld.applicant_id = a.applicant_id
-                    WHERE la.department_id = 3 AND la.application_id IN (
-                    SELECT application_id
-                    FROM tbl_Department_Status
-                    WHERE department_id = 2 AND status = 'approved'
-            );
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
@@ -237,10 +186,12 @@ router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req,
                         ON la.application_id = ld.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
+                    JOIN tbl_Loan_Application lap
+                        ON la.application_id = lap.application_id
                     WHERE la.department_id = @departmentId AND la.application_id IN (
                     SELECT application_id
                     FROM tbl_Department_Status
-                    WHERE department_id = 1 AND status = 'Approved');
+                    WHERE lap.is_filled_out IS NOT NULL)
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
@@ -1250,7 +1201,7 @@ const generateJWT = (staff_id, first_name, last_name, email, role) => {
 };
 // POST METHOD: Assess Loan Application
 router.post("/loanApplication/assessLoanApplication", async (req, res) => {
-    var _a, _b;
+    var _a;
     const data = req.body;
     try {
         const pool = await connectToDatabase();
@@ -1259,17 +1210,6 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         const toYesNo = (val) => val === true || val === "true" ? "Yes" : "No";
         const request = new sql.Request(transaction);
         await request
-            .input("loan_application_form", sql.VarChar(50), toYesNo(data.loanApplicationForm))
-            .input("authorization_to_deduct", sql.VarChar(50), toYesNo(data.authorizationToDeduct))
-            .input("latest_pay_slip", sql.VarChar(50), toYesNo(data.latestPaySlip))
-            .input("photocopy_deped_id", sql.VarChar(50), toYesNo(data.photocopyDepEdId))
-            .input("approved_appointment", sql.VarChar(50), toYesNo(data.approvedAppointment))
-            .input("proof_co_terminus", sql.VarChar(50), toYesNo(data.proofCoTerminus))
-            .input("others", sql.VarChar(250), (_a = data.othersSpecify) !== null && _a !== void 0 ? _a : null)
-            .input("letter_of_request", sql.VarChar(50), toYesNo(data.letterOfRequest))
-            .input("hospitalization", sql.VarChar(50), toYesNo(data.hospitalization))
-            .input("medical_abstract", sql.VarChar(50), toYesNo(data.medicalAbstract))
-            .input("barangay", sql.VarChar(50), toYesNo(data.barangayCertificate))
             .input("signed_filled_laf", sql.VarChar(50), toYesNo(data.signedFilledLaf))
             .input("complete_supporting_documents", sql.VarChar(50), toYesNo(data.completeSupportingDocs))
             .input("authorized_signature_laf", sql.VarChar(50), toYesNo(data.authorizedSignatureLaf))
@@ -1294,30 +1234,26 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
             .input("period_of_loan", sql.Int, data.periodOfLoan)
             // .input("processed_by", sql.VarChar(50), data.processedBy)
             // .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
-            .input("remarks", sql.VarChar(250), (_b = data.remarks) !== null && _b !== void 0 ? _b : null)
+            .input("remarks", sql.VarChar(250), (_a = data.remarks) !== null && _a !== void 0 ? _a : null)
             .input("application_id", sql.Int, data.application_id).query(`
         INSERT INTO tbl_Assessment_Form (
-          loan_application_form, authorization_to_deduct, latest_pay_slip,
-          photocopy_deped_id, approved_appointment, proof_co_terminus, others,
-          letter_of_request, hospitalization, medical_abstract, barangay,
           signed_filled_laf, complete_supporting_documents, authorized_signature_laf,
           borrower_reaches_retirement, borrowers_age, comakers_reaches_retirement, comakers_age,
           borrowers_has_outstanding_balance, current_loan_balance, past_due_loan,
           number_of_years_past_due, number_of_months_past_due, borrowers_take_home_pay,
           paid_30_percent, percentage_of_principal_paid, principal_loan_amount,
           principal, interest, net_proceeds, net_take_home_pay_after_deduction,
-          monthly_amortization, period_of_loan, remarks, application_id
+          monthly_amortization, period_of_loan, remarks, application_id,
+          computation_date_processed, eligibility_date_processed
         ) VALUES (
-          @loan_application_form, @authorization_to_deduct, @latest_pay_slip,
-          @photocopy_deped_id, @approved_appointment, @proof_co_terminus, @others,
-          @letter_of_request, @hospitalization, @medical_abstract, @barangay,
           @signed_filled_laf, @complete_supporting_documents, @authorized_signature_laf,
           @borrower_reaches_retirement, @borrowers_age, @comakers_reaches_retirement, @comakers_age,
           @borrowers_has_outstanding_balance, @current_loan_balance, @past_due_loan,
           @number_of_years_past_due, @number_of_months_past_due, @borrowers_take_home_pay,
           @paid_30_percent, @percentage_of_principal_paid, @principal_loan_amount,
           @principal, @interest, @net_proceeds, @net_take_home_pay_after_deduction,
-          @monthly_amortization, @period_of_loan, @remarks, @application_id
+          @monthly_amortization, @period_of_loan, @remarks, @application_id,
+          GETDATE(), GETDATE()
         )
       `);
         // const request2 = new sql.Request(transaction);
@@ -1341,6 +1277,98 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         res
             .status(500)
             .json({ message: "Failed to assess loan application", error });
+    }
+});
+// POST METHOD: Assess Loan Application FOR ADMIN
+router.post("/loanApplication/assessLoanApplicationAdmin", async (req, res) => {
+    var _a;
+    const data = req.body;
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const toYesNo = (val) => val === true || val === "true" ? "Yes" : "No";
+        const request = new sql.Request(transaction);
+        await request
+            .input("loan_application_form", sql.VarChar(50), toYesNo(data.loanApplicationForm))
+            .input("authorization_to_deduct", sql.VarChar(50), toYesNo(data.authorizationToDeduct))
+            .input("latest_pay_slip", sql.VarChar(50), toYesNo(data.latestPaySlip))
+            .input("photocopy_deped_id", sql.VarChar(50), toYesNo(data.photocopyDepEdId))
+            .input("approved_appointment", sql.VarChar(50), toYesNo(data.approvedAppointment))
+            .input("proof_co_terminus", sql.VarChar(50), toYesNo(data.proofCoTerminus))
+            .input("others", sql.VarChar(250), (_a = data.othersSpecify) !== null && _a !== void 0 ? _a : null)
+            .input("letter_of_request", sql.VarChar(50), toYesNo(data.letterOfRequest))
+            .input("hospitalization", sql.VarChar(50), toYesNo(data.hospitalization))
+            .input("medical_abstract", sql.VarChar(50), toYesNo(data.medicalAbstract))
+            .input("barangay", sql.VarChar(50), toYesNo(data.barangayCertificate))
+            .input("application_id", sql.Int, data.application_id).query(`
+        INSERT INTO tbl_Assessment_Form (
+          loan_application_form, authorization_to_deduct, latest_pay_slip,
+          photocopy_deped_id, approved_appointment, proof_co_terminus, others,
+          letter_of_request, hospitalization, medical_abstract, barangay,
+          application_id
+        ) VALUES (
+          @loan_application_form, @authorization_to_deduct, @latest_pay_slip,
+          @photocopy_deped_id, @approved_appointment, @proof_co_terminus, @others,
+          @letter_of_request, @hospitalization, @medical_abstract, @barangay,
+         @application_id
+        )
+      `);
+        // const request2 = new sql.Request(transaction);
+        // await request2
+        //   .input("status", sql.VarChar(50), "Approved")
+        //   .input("application_id", sql.Int, data.application_id)
+        //   .input("department_id", sql.Int, data.department_id).query(`
+        //   UPDATE tbl_Department_Status
+        //   SET status = @status, updated_at = CURRENT_TIMESTAMP
+        //   WHERE application_id = @application_id AND department_id = @department_id
+        // `);
+        await transaction.commit();
+        res.status(201).json({
+            message: "Loan assessment added successfully",
+            data,
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("Failed to assess loan application:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to assess loan application", error });
+    }
+});
+// POST METHOD: Assess Personnel Part in Borrowers
+router.post("/loanApplication/assessPersonnelBorrowers", async (req, res) => {
+    const data = req.body;
+    try {
+        const pool = await connectToDatabase();
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        const request = new sql.Request(transaction);
+        await request
+            .input("employment_status_hr", sql.VarChar(50), data.employmentStatus)
+            .input("net_pay", sql.Decimal(18, 2), data.netPay)
+            .input("payroll_date", sql.DateTime, data.payrollMonth)
+            .input("application_id", sql.Int, data.applicationId).query(`
+          UPDATE tbl_Borrowers_Information
+          SET
+            employment_status_hr = @employment_status_hr,
+            net_pay = @net_pay,
+            payroll_date = @payroll_date
+          WHERE application_id = @application_id
+        `);
+        await transaction.commit();
+        res.status(201).json({
+            message: "Personnel section added successfully",
+            data,
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("Failed to assess personnel section:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to assess personnel section", error });
     }
 });
 // POST METHOD: Submit Accounting Signature
@@ -1464,100 +1492,6 @@ router.post("/loanApplication/rejectAccounting", async (req, res) => {
     }
     catch (error) {
         console.error("rejectAccounting error:", error);
-        res.status(500).json({ message: "Failed to reject application", error });
-    }
-});
-// POST METHOD: Submit Secretariat Signature
-router.post("/loanApplication/submitSignatureSecretariat", async (req, res) => {
-    const data = req.body;
-    // console.log(data);
-    try {
-        const pool = await connectToDatabase();
-        const transaction = new sql.Transaction(pool);
-        await transaction.begin();
-        const checkRequest = new sql.Request(transaction);
-        const checkResult = await checkRequest
-            .input("application_id", sql.Int, data.application_id)
-            .query(`SELECT signature_id FROM tbl_Signature WHERE application_id = @application_id`);
-        if (checkResult.recordset.length > 0) {
-            // If exists, update
-            const signatureId = checkResult.recordset[0].signature_id;
-            const updateRequest = new sql.Request(transaction);
-            await updateRequest
-                .input("application_id", sql.Int, data.application_id)
-                .input("staff_id_secretariat", sql.Int, data.staff_id)
-                .input("signature_secretariat", sql.NVarChar, data.signature)
-                .input("signature_id", sql.Int, signatureId).query(`
-            UPDATE tbl_Signature
-            SET application_id = @application_id,
-                staff_id_secretariat = @staff_id_secretariat,
-                signature_secretariat = @signature_secretariat,
-                secretariat_date = GETDATE()
-            WHERE signature_id = @signature_id
-          `);
-        }
-        else {
-            // No record, insert new
-            const insertRequest = new sql.Request(transaction);
-            await insertRequest
-                .input("application_id", sql.Int, data.application_id)
-                .input("staff_id_secretariat", sql.Int, data.staff_id)
-                .input("signature_secretariat", sql.NVarChar, data.signature).query(`
-            INSERT INTO tbl_Signature (application_id, staff_id_secretariat, signature_secretariat)
-            VALUES (@application_id, @staff_id_secretariat, @signature_secretariat)
-          `);
-        }
-        // Update loan status
-        // const statusRequest = new sql.Request(transaction);
-        // await statusRequest
-        //   .input("status", sql.VarChar(50), "Approved")
-        //   .input("application_id", sql.Int, data.application_id)
-        //   .input("department", sql.VarChar(50), "HR").query(`
-        //     UPDATE tbl_Department_Status
-        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
-        //     WHERE application_id = @application_id AND department = @department
-        //   `);
-        await transaction.commit();
-        updateLoanStatus("Secretariat", "Approved", data.application_id);
-        res.status(200).json({
-            message: checkResult.recordset.length > 0
-                ? "Signature updated successfully."
-                : "Signature added successfully.",
-            success: true,
-        });
-    }
-    catch (error) {
-        console.error("submitSignatureSecretariat error:", error);
-        res
-            .status(500)
-            .json({ message: "Failed to submit Secretariat signature", error });
-    }
-});
-// POST METHOD: Reject Secretariat Application
-router.post("/loanApplication/rejectSecretariat", async (req, res) => {
-    const data = req.body;
-    try {
-        // Update department status
-        await updateLoanStatus("Secretariat", "Rejected", data.application_id);
-        // Update main loan application status to 'Rejected'
-        const pool = await connectToDatabase();
-        await pool
-            .request()
-            .input("application_id", sql.Int, data.application_id)
-            .input("status", sql.VarChar, "Rejected")
-            .input("remarks_message", sql.VarChar, data.remarks).query(`
-          UPDATE tbl_Loan_Application
-          SET status = @status,
-          remarks_message = @remarks_message
-          WHERE application_id = @application_id
-        `);
-        res.status(200).json({
-            message: "Rejected Application successfully.",
-            success: true,
-        });
-    }
-    catch (error) {
-        console.error("rejectSecretariat error:", error);
         res.status(500).json({ message: "Failed to reject application", error });
     }
 });
@@ -2161,9 +2095,6 @@ async function updateLoanStatusHistory(initiator, application_id, transaction) {
             case "accounting":
                 remarkMsg = "For Assessment";
                 break;
-            case "secretariat":
-                remarkMsg = "For Signature";
-                break;
             case "hr":
                 remarkMsg = "For Signature";
                 break;
@@ -2631,7 +2562,6 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
             case "accounting":
                 remarkMsg = "For Assessment";
                 break;
-            case "secretariat":
             case "hr":
             case "admin":
                 remarkMsg = "For Signature";
@@ -2723,7 +2653,6 @@ router.patch("/loanApplication/updateApprovalAccounting", async (req, res) => {
             case "accounting":
                 remarkMsg = "For Assessment";
                 break;
-            case "secretariat":
             case "hr":
             case "admin":
                 remarkMsg = "For Signature";
