@@ -1200,9 +1200,10 @@ const generateJWT = (staff_id, first_name, last_name, email, role) => {
     return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256" });
 };
 // POST METHOD: Assess Loan Application
-router.post("/loanApplication/assessLoanApplication", async (req, res) => {
+router.patch("/loanApplication/assessLoanApplication/:application_id", async (req, res) => {
     var _a;
     const data = req.body;
+    const application_id = parseInt(req.params.application_id);
     try {
         const pool = await connectToDatabase();
         const transaction = new sql.Transaction(pool);
@@ -1210,9 +1211,6 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
         const toYesNo = (val) => val === true || val === "true" ? "Yes" : "No";
         const request = new sql.Request(transaction);
         await request
-            .input("signed_filled_laf", sql.VarChar(50), toYesNo(data.signedFilledLaf))
-            .input("complete_supporting_documents", sql.VarChar(50), toYesNo(data.completeSupportingDocs))
-            .input("authorized_signature_laf", sql.VarChar(50), toYesNo(data.authorizedSignatureLaf))
             .input("borrower_reaches_retirement", sql.VarChar(50), toYesNo(data.borrowerReachesRetirement))
             .input("borrowers_age", sql.Int, data.borrowersAge)
             .input("comakers_reaches_retirement", sql.VarChar(50), toYesNo(data.comakersReachesRetirement))
@@ -1232,51 +1230,46 @@ router.post("/loanApplication/assessLoanApplication", async (req, res) => {
             .input("net_take_home_pay_after_deduction", sql.Decimal(10, 2), data.netTakeHomePayAfterAmortization)
             .input("monthly_amortization", sql.Decimal(10, 2), data.monthlyAmortization)
             .input("period_of_loan", sql.Int, data.periodOfLoan)
-            // .input("processed_by", sql.VarChar(50), data.processedBy)
-            // .input("reviewed_by", sql.VarChar(50), data.reviewedBy)
             .input("remarks", sql.VarChar(250), (_a = data.remarks) !== null && _a !== void 0 ? _a : null)
-            .input("application_id", sql.Int, data.application_id).query(`
-        INSERT INTO tbl_Assessment_Form (
-          signed_filled_laf, complete_supporting_documents, authorized_signature_laf,
-          borrower_reaches_retirement, borrowers_age, comakers_reaches_retirement, comakers_age,
-          borrowers_has_outstanding_balance, current_loan_balance, past_due_loan,
-          number_of_years_past_due, number_of_months_past_due, borrowers_take_home_pay,
-          paid_30_percent, percentage_of_principal_paid, principal_loan_amount,
-          principal, interest, net_proceeds, net_take_home_pay_after_deduction,
-          monthly_amortization, period_of_loan, remarks, application_id,
-          computation_date_processed, eligibility_date_processed
-        ) VALUES (
-          @signed_filled_laf, @complete_supporting_documents, @authorized_signature_laf,
-          @borrower_reaches_retirement, @borrowers_age, @comakers_reaches_retirement, @comakers_age,
-          @borrowers_has_outstanding_balance, @current_loan_balance, @past_due_loan,
-          @number_of_years_past_due, @number_of_months_past_due, @borrowers_take_home_pay,
-          @paid_30_percent, @percentage_of_principal_paid, @principal_loan_amount,
-          @principal, @interest, @net_proceeds, @net_take_home_pay_after_deduction,
-          @monthly_amortization, @period_of_loan, @remarks, @application_id,
-          GETDATE(), GETDATE()
-        )
-      `);
-        // const request2 = new sql.Request(transaction);
-        // await request2
-        //   .input("status", sql.VarChar(50), "Approved")
-        //   .input("application_id", sql.Int, data.application_id)
-        //   .input("department_id", sql.Int, data.department_id).query(`
-        //   UPDATE tbl_Department_Status
-        //   SET status = @status, updated_at = CURRENT_TIMESTAMP
-        //   WHERE application_id = @application_id AND department_id = @department_id
-        // `);
+            .input("application_id", sql.Int, application_id)
+            .query(`
+          UPDATE tbl_Assessment_Form SET
+            borrower_reaches_retirement = @borrower_reaches_retirement,
+            borrowers_age = @borrowers_age,
+            comakers_reaches_retirement = @comakers_reaches_retirement,
+            comakers_age = @comakers_age,
+            borrowers_has_outstanding_balance = @borrowers_has_outstanding_balance,
+            current_loan_balance = @current_loan_balance,
+            past_due_loan = @past_due_loan,
+            number_of_years_past_due = @number_of_years_past_due,
+            number_of_months_past_due = @number_of_months_past_due,
+            borrowers_take_home_pay = @borrowers_take_home_pay,
+            paid_30_percent = @paid_30_percent,
+            percentage_of_principal_paid = @percentage_of_principal_paid,
+            principal_loan_amount = @principal_loan_amount,
+            principal = @principal,
+            interest = @interest,
+            net_proceeds = @net_proceeds,
+            net_take_home_pay_after_deduction = @net_take_home_pay_after_deduction,
+            monthly_amortization = @monthly_amortization,
+            period_of_loan = @period_of_loan,
+            remarks = @remarks,
+            computation_date_processed = GETDATE(),
+            eligibility_date_processed = GETDATE()
+          WHERE application_id = @application_id
+        `);
         await transaction.commit();
-        res.status(201).json({
-            message: "Loan assessment added successfully",
+        res.status(200).json({
+            message: "Loan assessment updated successfully",
             data,
             success: true,
         });
     }
     catch (error) {
-        console.error("Failed to assess loan application:", error);
+        console.error("Failed to update loan assessment:", error);
         res
             .status(500)
-            .json({ message: "Failed to assess loan application", error });
+            .json({ message: "Failed to update loan assessment", error });
     }
 });
 // POST METHOD: Assess Loan Application FOR ADMIN
@@ -1290,6 +1283,9 @@ router.post("/loanApplication/assessLoanApplicationAdmin", async (req, res) => {
         const toYesNo = (val) => val === true || val === "true" ? "Yes" : "No";
         const request = new sql.Request(transaction);
         await request
+            .input("signed_filled_laf", sql.VarChar(50), toYesNo(data.signedFilledLaf))
+            .input("complete_supporting_documents", sql.VarChar(50), toYesNo(data.completeSupportingDocs))
+            .input("authorized_signature_laf", sql.VarChar(50), toYesNo(data.authorizedSignatureLaf))
             .input("loan_application_form", sql.VarChar(50), toYesNo(data.loanApplicationForm))
             .input("authorization_to_deduct", sql.VarChar(50), toYesNo(data.authorizationToDeduct))
             .input("latest_pay_slip", sql.VarChar(50), toYesNo(data.latestPaySlip))
@@ -1303,11 +1299,13 @@ router.post("/loanApplication/assessLoanApplicationAdmin", async (req, res) => {
             .input("barangay", sql.VarChar(50), toYesNo(data.barangayCertificate))
             .input("application_id", sql.Int, data.application_id).query(`
         INSERT INTO tbl_Assessment_Form (
+          signed_filled_laf, complete_supporting_documents, authorized_signature_laf,
           loan_application_form, authorization_to_deduct, latest_pay_slip,
           photocopy_deped_id, approved_appointment, proof_co_terminus, others,
           letter_of_request, hospitalization, medical_abstract, barangay,
           application_id
         ) VALUES (
+          @signed_filled_laf, @complete_supporting_documents, @authorized_signature_laf,
           @loan_application_form, @authorization_to_deduct, @latest_pay_slip,
           @photocopy_deped_id, @approved_appointment, @proof_co_terminus, @others,
           @letter_of_request, @hospitalization, @medical_abstract, @barangay,
@@ -1411,16 +1409,6 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
             VALUES (@application_id, @staff_id_accounting, @signature_accounting)
           `);
         }
-        // Update loan status
-        // const statusRequest = new sql.Request(transaction);
-        // await statusRequest
-        //   .input("status", sql.VarChar(50), "Approved")
-        //   .input("application_id", sql.Int, data.application_id)
-        //   .input("department", sql.VarChar(50), "HR").query(`
-        //     UPDATE tbl_Department_Status
-        //     SET status = @status, updated_at = CURRENT_TIMESTAMP
-        //     WHERE application_id = @application_id AND department = @department
-        //   `);
         await transaction.commit();
         updateLoanStatus("Accounting", "Approved", data.application_id);
         res.status(200).json({
@@ -2192,70 +2180,6 @@ router.post("/addLoanData", upload.fields([
                 @purpose, @borrowers_agreement, @co_makers_agreement, @applicant_id, @application_id, @other_purpose)
             `;
             await request2.query(sql2);
-            // tbl_Co_Makers_Information
-            // const request3 = new sql.Request(transaction);
-            // request3.input("co_last_name", sql.VarChar, comakerInfoParse.lastName);
-            // request3.input(
-            //   "co_first_name",
-            //   sql.VarChar,
-            //   comakerInfoParse.firstname
-            // );
-            // request3.input(
-            //   "co_middle_initial",
-            //   sql.VarChar,
-            //   comakerInfoParse.middleName
-            // );
-            // request3.input("co_region", sql.VarChar, comakerInfoParse.region);
-            // request3.input("co_province", sql.VarChar, comakerInfoParse.province);
-            // request3.input("co_city", sql.VarChar, comakerInfoParse.city);
-            // request3.input("co_barangay", sql.VarChar, comakerInfoParse.barangay);
-            // request3.input("co_street", sql.VarChar, comakerInfoParse.street);
-            // request3.input("co_zipcode", sql.VarChar, comakerInfoParse.zipcode);
-            // request3.input(
-            //   "co_employee_number",
-            //   sql.Int,
-            //   comakerInfoParse.employeeNo
-            // );
-            // request3.input(
-            //   "co_employment_status",
-            //   sql.VarChar,
-            //   comakerInfoParse.employeeStatus
-            // );
-            // request3.input("co_date_of_birth", sql.Date, comakerInfoParse.birth);
-            // request3.input("co_age", sql.Int, comakerInfoParse.age);
-            // request3.input("co_office", sql.VarChar, comakerInfoParse.office);
-            // request3.input(
-            //   "co_monthly_salary",
-            //   sql.Decimal,
-            //   comakerInfoParse.salary
-            // );
-            // request3.input(
-            //   "co_office_tel_number",
-            //   sql.VarChar,
-            //   comakerInfoParse.officeTelNo
-            // );
-            // request3.input(
-            //   "co_years_in_service",
-            //   sql.Int,
-            //   comakerInfoParse.yearService
-            // );
-            // request3.input("co_mobile_number", sql.VarChar, comakerInfoParse.mobileNo);
-            // request3.input("applicant_id", sql.Int, applicant_id);
-            // request3.input("application_id", sql.Int, application_id);
-            // request3.input("position", sql.VarChar, comakerInfoParse.position);
-            // const sql3 = `
-            //         INSERT INTO [tbl_Co_Makers_Information]
-            //         ([co_last_name], [co_first_name], [co_middle_initial], [co_region], [co_province],
-            //          [co_city], [co_barangay], [co_street], [co_zipcode], [co_employee_number],
-            //          [co_employment_status], [co_date_of_birth], [co_age], [co_office], [co_monthly_salary],
-            //          [co_office_tel_number], [co_years_in_service], [co_mobile_number], [applicant_id], [application_id], [position])
-            //         VALUES
-            //         (@co_last_name, @co_first_name, @co_middle_initial, @co_region, @co_province,
-            //          @co_city, @co_barangay, @co_street, @co_zipcode, @co_employee_number,
-            //          @co_employment_status, @co_date_of_birth, @co_age, @co_office, @co_monthly_salary,
-            //          @co_office_tel_number, @co_years_in_service, @co_mobile_number, @applicant_id, @application_id, @position)
-            //     `;
-            // await request3.query(sql3);
             const request3 = new sql.Request(transaction);
             request3.input("co_email", sql.VarChar, comakerInfoParse.email);
             request3.input("application_id", sql.Int, application_id);
@@ -2369,7 +2293,6 @@ router.post("/addLoanData", upload.fields([
             (${application_id}, 6, 'Pending'),
             (${application_id}, 7, 'Pending'),
             (${application_id}, 8, 'Pending'),
-            (${application_id}, 9, 'Pending')
             `;
             await new sql.Request(transaction).query(sql8);
             // Update Loan Status History
