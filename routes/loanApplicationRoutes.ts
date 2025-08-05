@@ -375,6 +375,7 @@ router.get(
                     APP.first_name first_name,
                     APP.last_name last_name,
                     O.department_name department_name,
+                    LA.remarks_message,
                     ApS.*,
                     ROW_NUMBER() OVER (PARTITION BY ApS.application_id ORDER BY O.sequence_order ASC) AS rn
                 FROM tbl_Loan_Application LA
@@ -385,7 +386,7 @@ router.get(
                 WHERE ApS.status IN ('Pending', 'Rejected')
                   AND LA.is_filled_out = 'Yes'
             )
-            SELECT application_id, status, department_name, amount, loan_type, application_date, first_name, last_name, applicant_id, purpose
+            SELECT application_id, status, department_name, amount, loan_type, application_date, first_name, last_name, applicant_id, purpose, remarks_message
             FROM RankedStatuses
             WHERE rn = 1
             ORDER BY application_id;
@@ -1473,6 +1474,7 @@ router.patch(
         )
         .input("principal", sql.Decimal(10, 2), data.principal)
         .input("interest", sql.Decimal(10, 2), data.interest)
+        .input("outstanding_balance", sql.Decimal(10, 2), data.outstandingBalance)
         .input("net_proceeds", sql.Decimal(10, 2), data.netProceeds)
         .input(
           "net_take_home_pay_after_deduction",
@@ -1504,6 +1506,7 @@ router.patch(
             principal_loan_amount = @principal_loan_amount,
             principal = @principal,
             interest = @interest,
+            outstanding_balance = @outstanding_balance,
             net_proceeds = @net_proceeds,
             net_take_home_pay_after_deduction = @net_take_home_pay_after_deduction,
             monthly_amortization = @monthly_amortization,
