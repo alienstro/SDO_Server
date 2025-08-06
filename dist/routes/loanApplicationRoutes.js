@@ -9,30 +9,6 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
     try {
         const departmentId = parseInt(req.params.departmentId);
         const pool = await connectToDatabase();
-        // const result = await pool.request().query(`
-        //       SELECT
-        //           ld.loan_details_id,
-        //           ld.loan_amount,
-        //           ld.type_of_loan,
-        //           ld.term,
-        //           ld.loan_application_number,
-        //           ld.purpose,
-        //           ld.borrowers_agreement,
-        //           ld.co_makers_agreement,
-        //           ld.applicant_id,
-        //           ld.application_id,
-        //           ld.date_submitted,
-        //           a.last_name,
-        //           a.first_name,
-        //           a.middle_name,
-        //           la.is_approved_osds
-        //       FROM tbl_Loan_Application la
-        //       JOIN tbl_Loan_Details ld
-        //           ON la.application_id = ld.application_id
-        //       JOIN tbl_Applicant a
-        //           ON la.applicant_id = a.applicant_id
-        //       WHERE la.is_filled_out = 'Yes';
-        //   `);
         console.log(departmentId);
         const result = await pool.request().input("departmentId", departmentId)
             .query(`
@@ -58,10 +34,10 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
                         ON la.application_id = ld.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
-                    WHERE la.department_id = 8 AND la.application_id IN (
+                    WHERE la.department_id = 6 AND la.application_id IN (
                     SELECT application_id
                     FROM tbl_Department_Status
-                    WHERE department_id IN (6, 7) AND status = 'Approved');
+                    WHERE department_id IN (5) AND status = 'Approved');
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
@@ -242,7 +218,7 @@ router.get("/loanApplication/getLoanDetailsApproval/:departmentId", async (req, 
                     WHERE la.department_id = @departmentId AND la.application_id IN (
                     SELECT application_id
                     FROM tbl_Department_Status
-                    WHERE department_id = 5 AND status = 'Approved');
+                    WHERE department_id = 4 AND status = 'Approved');
         `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
@@ -2295,7 +2271,6 @@ router.post("/addLoanData", upload.fields([
             (${application_id}, 5, 'Pending'),
             (${application_id}, 6, 'Pending'),
             (${application_id}, 7, 'Pending'),
-            (${application_id}, 8, 'Pending'),
             `;
             await new sql.Request(transaction).query(sql8);
             // Update Loan Status History
