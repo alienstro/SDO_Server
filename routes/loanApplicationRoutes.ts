@@ -81,6 +81,33 @@ router.get(
   }
 );
 
+// GET METHOD: Fetch docuemtns
+router.get(
+  "/loanApplication/getDocuments/:application_id",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const applicationId = parseInt(req.params.application_id);
+
+      const pool = await connectToDatabase();
+      const result = await pool.request().input("application_id", applicationId)
+        .query(`
+            SELECT * 
+            FROM [tbl_Documents]
+            WHERE application_id = @application_id; 
+        `);
+
+      if (result.recordset.length > 0) {
+        res.status(200).json(result.recordset);
+      } else {
+        res.status(404).json({ message: "No Documents found" });
+      }
+    } catch (error) {
+      console.error("Failed to retrieve documents:", error);
+      res.status(500).json({ message: "Failed to retrieve documents", error });
+    }
+  }
+);
+
 // GET METHOD: Fetch loanDetails for Signature by Application Id
 router.get(
   "/loanApplication/getSignatureDetailsApplicationId/:application_id",
@@ -174,7 +201,8 @@ router.get(
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status
+                la.status,
+                lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
@@ -389,7 +417,7 @@ router.get(
     try {
       const pool = await connectToDatabase();
       const result = await pool.request().query(`
-            SELECT 
+           SELECT 
                 LA.amount amount,
                 LA.loan_type loan_type,
                 LA.application_date application_date,
@@ -410,7 +438,7 @@ router.get(
                 ON Aps.department_id = O.department_id
                 JOIN tbl_Loan_Details LD
                 ON LA.application_ID = LD.application_id 
-                WHERE ApS.status = 'Paid' AND o.department_name = 'Payment';
+                WHERE ApS.status = 'Approved' AND o.department_name = 'OSDS';
         `);
 
       if (result.recordset.length > 0) {
@@ -1450,7 +1478,11 @@ router.patch(
         )
         .input("principal", sql.Decimal(10, 2), data.principal)
         .input("interest", sql.Decimal(10, 2), data.interest)
-        .input("outstanding_balance", sql.Decimal(10, 2), data.outstandingBalance)
+        .input(
+          "outstanding_balance",
+          sql.Decimal(10, 2),
+          data.outstandingBalance
+        )
         .input("net_proceeds", sql.Decimal(10, 2), data.netProceeds)
         .input(
           "net_take_home_pay_after_deduction",
@@ -1462,10 +1494,9 @@ router.patch(
           sql.Decimal(10, 2),
           data.monthlyAmortization
         )
-        .input("period_of_loan", sql.Int, data.periodOfLoan)
+        .input("period_of_loan", sql.VarChar, data.periodOfLoan)
         .input("remarks", sql.VarChar(250), data.remarks ?? null)
-        .input("application_id", sql.Int, application_id)
-        .query(`
+        .input("application_id", sql.Int, application_id).query(`
           UPDATE tbl_Assessment_Form SET
             borrower_reaches_retirement = @borrower_reaches_retirement,
             borrowers_age = @borrowers_age,
@@ -2752,11 +2783,6 @@ router.post(
           getFilePath("idApplicant")
         );
         request5.input(
-          "authorityToDeduct_path",
-          sql.VarChar,
-          getFilePath("authorityToDeduct")
-        );
-        request5.input(
           "payslipApplicant_path",
           sql.VarChar,
           getFilePath("payslipApplicant")
@@ -2773,7 +2799,6 @@ router.post(
                 [emergency_path],
                 [idComaker_path],
                 [idApplicant_path],
-                [authorityToDeduct_path],
                 [payslipApplicant_path],
                 [payslipComaker_path],
                 [application_id])
@@ -2782,7 +2807,6 @@ router.post(
                 @emergency_path,
                 @idComaker_path,
                 @idApplicant_path,
-                @authorityToDeduct_path,
                 @payslipApplicant_path,
                 @payslipComaker_path,
                 @application_id)
@@ -2821,7 +2845,7 @@ router.post(
             (${application_id}, 3, 'Pending'),
             (${application_id}, 4, 'Pending'),
             (${application_id}, 5, 'Pending'),
-            (${application_id}, 6, 'Pending'),
+            (${application_id}, 6, 'Pending')
             `;
         await new sql.Request(transaction).query(sql8);
 
