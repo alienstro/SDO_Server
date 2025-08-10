@@ -377,6 +377,64 @@ router.post(
   }
 );
 
+// PUT METHOD: Change Applicant Password
+router.put(
+  "/applicantUser/change-password/:applicant_id",
+  async (req: Request, res: Response): Promise<any> => {
+    const { applicant_id } = req.params;
+    const { current_password, new_password } = req.body.details;
+
+    try {
+      const pool = await connectToDatabase();
+
+      // Get the current hashed password from the database
+      const result = await pool
+        .request()
+        .input("applicant_id", sql.Int, Number(applicant_id))
+        .query(`
+          SELECT password FROM [sdo_accounting].[dbo].[tbl_Applicant]
+          WHERE applicant_id = @applicant_id
+        `);
+
+      if (result.recordset.length === 0) {
+        return res.status(404).json({ success: false, message: "Applicant not found." });
+      }
+
+      const hashedPassword = result.recordset[0].password;
+
+      // Verify the current password
+      const isMatch = await argon2.verify(hashedPassword, current_password);
+      if (!isMatch) {
+        return res.status(409).json({ success: false, message: "The current password you entered is incorrect." });
+      }
+
+      // Hash the new password
+      const newPasswordHash = await argon2.hash(new_password, {
+        type: argon2.argon2id,
+        timeCost: 3,
+        memoryCost: 19456,
+        parallelism: 1,
+      });
+
+      // Update the password in the database
+      await pool
+        .request()
+        .input("applicant_id", sql.Int, Number(applicant_id))
+        .input("password", sql.VarChar, newPasswordHash)
+        .query(`
+          UPDATE [sdo_accounting].[dbo].[tbl_Applicant]
+          SET password = @password
+          WHERE applicant_id = @applicant_id
+        `);
+
+      res.status(200).json({ success: true, message: "Password changed successfully." });
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      res.status(500).json({ success: false, message: "Failed to change password.", error });
+    }
+  }
+);
+
 // PUT METHOD: Update Applicant User
 router.put(
   "/applicantUser/:applicant_id",
@@ -644,6 +702,64 @@ router.put(
     } catch (error) {
       console.error("Failed to update staff:", error);
       res.status(500).json({ message: "Failed to update staff", error });
+    }
+  }
+);
+
+// PUT METHOD: Change Staff Password
+router.put(
+  "/staffUser/change-password/:staff_id",
+  async (req: Request, res: Response): Promise<any> => {
+    const { staff_id } = req.params;
+    const { current_password, new_password } = req.body.details;
+
+    try {
+      const pool = await connectToDatabase();
+
+      // Get the current hashed password from the database
+      const result = await pool
+        .request()
+        .input("staff_id", sql.Int, Number(staff_id))
+        .query(`
+          SELECT password FROM [sdo_accounting].[dbo].[tbl_Staff]
+          WHERE staff_id = @staff_id
+        `);
+
+      if (result.recordset.length === 0) {
+        return res.status(404).json({ success: false, message: "Staff not found." });
+      }
+
+      const hashedPassword = result.recordset[0].password;
+
+      // Verify the current password
+      const isMatch = await argon2.verify(hashedPassword, current_password);
+      if (!isMatch) {
+        return res.status(409).json({ success: false, message: "The current password you entered is incorrect." });
+      }
+
+      // Hash the new password
+      const newPasswordHash = await argon2.hash(new_password, {
+        type: argon2.argon2id,
+        timeCost: 3,
+        memoryCost: 19456,
+        parallelism: 1,
+      });
+
+      // Update the password in the database
+      await pool
+        .request()
+        .input("staff_id", sql.Int, Number(staff_id))
+        .input("password", sql.VarChar, newPasswordHash)
+        .query(`
+          UPDATE [sdo_accounting].[dbo].[tbl_Staff]
+          SET password = @password
+          WHERE staff_id = @staff_id
+        `);
+
+      res.status(200).json({ success: true, message: "Password changed successfully." });
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      res.status(500).json({ success: false, message: "Failed to change password.", error });
     }
   }
 );
