@@ -2934,6 +2934,15 @@ router.patch(
           .json({ success: false, message: "Failed to insert status history" });
       }
 
+      const updateStatusLoan = await transaction
+        .request()
+        .input("status", sql.VarChar, "Approved")
+        .input("application_id", sql.Int, application_id).query(`
+                UPDATE tbl_Loan_Application
+                SET status = @status
+                WHERE application_id = @application_id;
+            `);
+
       // Commit transaction
       await transaction.commit();
 
