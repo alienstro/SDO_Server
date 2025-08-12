@@ -34,10 +34,13 @@ router.get(
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status
+                la.status,
+                lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
+                    JOIN tbl_Loan_Application lap
+                        ON la.application_id = lap.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = 6 AND la.application_id IN (
@@ -260,7 +263,8 @@ router.get(
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                lap.status
+                lap.status,
+                lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
