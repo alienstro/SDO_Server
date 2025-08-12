@@ -201,7 +201,7 @@ router.get(
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status,
+                lap.status,
                 lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
@@ -260,10 +260,12 @@ router.get(
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status
+                lap.status
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
+                    JOIN tbl_Loan_Application lap
+                        ON la.application_id = lap.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = @departmentId AND la.application_id IN (
@@ -1633,15 +1635,25 @@ router.post(
 
 // POST METHOD: Reject Admin Application
 router.post(
-  "/loanApplication/rejectAdmin",
+  "/loanApplication/rejectApplicationOffice",
   async (req: Request, res: Response): Promise<any> => {
     const data = req.body;
 
     try {
       // Update department status
-      await updateLoanStatus("Admin", "Rejected", data.application_id);
-      await updateLoanStatus("HR", "Rejected", data.application_id);
-      await updateLoanStatus("Legal", "Rejected", data.application_id);
+      if (data.office === 'Admin') {
+        await updateLoanStatus("Admin", "Rejected", data.application_id);
+      } else if (data.office === 'HR') {
+        await updateLoanStatus("HR", "Rejected", data.application_id);
+      } else if (data.office === 'Legal') {
+        await updateLoanStatus("Legal", "Rejected", data.application_id);
+      } else if (data.office === 'ASDS') {
+        await updateLoanStatus("ASDS", "Rejected", data.application_id);
+      } else if (data.office === 'OSDS') {
+        await updateLoanStatus("OSDS", "Rejected", data.application_id);
+      } else {
+        res.status(500).json({ message: "Unkown Department Office" });
+      }
 
       // Update main loan application status to 'Rejected'
       const pool = await connectToDatabase();
