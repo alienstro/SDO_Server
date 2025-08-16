@@ -295,9 +295,10 @@ router.get(
           designation,
           email,
           department_id,
-          emp_status
+          emp_status,
+          signature
         FROM [sdo_accounting].[dbo].[tbl_Staff]
-        WHERE staff_id <> @staff_id
+        WHERE staff_id = @staff_id
       `);
 
       if (result.recordset.length > 0) {
