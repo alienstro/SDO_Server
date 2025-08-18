@@ -234,9 +234,10 @@ router.get("/staffUser/:staff_id", async (req, res) => {
           designation,
           email,
           department_id,
-          emp_status
+          emp_status,
+          signature
         FROM [sdo_accounting].[dbo].[tbl_Staff]
-        WHERE staff_id <> @staff_id
+        WHERE staff_id = @staff_id
       `);
         if (result.recordset.length > 0) {
             res.status(200).json(result.recordset);
