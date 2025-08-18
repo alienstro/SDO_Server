@@ -177,7 +177,7 @@ router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req,
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                lap.status,
+                la.status,
                 lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
@@ -231,12 +231,10 @@ router.get("/loanApplication/getLoanDetailsApproval/:departmentId", async (req, 
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                lap.status
+                la.status
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
-                    JOIN tbl_Loan_Application lap
-                        ON la.application_id = lap.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = @departmentId AND la.application_id IN (
@@ -1291,14 +1289,6 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
                 accounting_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         else {
             // No record, insert new
@@ -1310,14 +1300,6 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
             INSERT INTO tbl_Signature (application_id, staff_id_accounting, signature_accounting)
             VALUES (@application_id, @staff_id_accounting, @signature_accounting)
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         await transaction.commit();
         updateLoanStatus("Accounting", "Approved", data.application_id);
@@ -1336,28 +1318,13 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
     }
 });
 // POST METHOD: Reject Admin Application
-router.post("/loanApplication/rejectApplicationOffice", async (req, res) => {
+router.post("/loanApplication/rejectAdmin", async (req, res) => {
     const data = req.body;
     try {
         // Update department status
-        if (data.office === 'Admin') {
-            await updateLoanStatus("Admin", "Rejected", data.application_id);
-        }
-        else if (data.office === 'HR') {
-            await updateLoanStatus("HR", "Rejected", data.application_id);
-        }
-        else if (data.office === 'Legal') {
-            await updateLoanStatus("Legal", "Rejected", data.application_id);
-        }
-        else if (data.office === 'ASDS') {
-            await updateLoanStatus("ASDS", "Rejected", data.application_id);
-        }
-        else if (data.office === 'OSDS') {
-            await updateLoanStatus("OSDS", "Rejected", data.application_id);
-        }
-        else {
-            res.status(500).json({ message: "Unkown Department Office" });
-        }
+        await updateLoanStatus("Admin", "Rejected", data.application_id);
+        await updateLoanStatus("HR", "Rejected", data.application_id);
+        await updateLoanStatus("Legal", "Rejected", data.application_id);
         // Update main loan application status to 'Rejected'
         const pool = await connectToDatabase();
         await pool
@@ -1436,14 +1403,6 @@ router.post("/loanApplication/submitSignatureHR", async (req, res) => {
                 hr_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         else {
             // No record, insert new
@@ -1455,14 +1414,6 @@ router.post("/loanApplication/submitSignatureHR", async (req, res) => {
             INSERT INTO tbl_Signature (application_id, staff_id_hr, signature_hr)
             VALUES (@application_id, @staff_id_hr, @signature_hr)
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         // Update loan status
         // const statusRequest = new sql.Request(transaction);
@@ -1516,14 +1467,6 @@ router.post("/loanApplication/submitSignatureASDS", async (req, res) => {
                 asds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         else {
             // No record, insert new
@@ -1535,14 +1478,6 @@ router.post("/loanApplication/submitSignatureASDS", async (req, res) => {
             INSERT INTO tbl_Signature (application_id, staff_id_asds, signature_asds)
             VALUES (@application_id, @staff_id_asds, @signature_asds)
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         // Update loan status
         // const statusRequest = new sql.Request(transaction);
@@ -1664,14 +1599,6 @@ router.post("/loanApplication/submitSignatureAdmin", async (req, res) => {
                 admin_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         else {
             // No record, insert new
@@ -1683,14 +1610,6 @@ router.post("/loanApplication/submitSignatureAdmin", async (req, res) => {
             INSERT INTO tbl_Signature (application_id, staff_id_admin, signature_admin)
             VALUES (@application_id, @staff_id_admin, @signature_admin)
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         // Update loan status
         // const statusRequest = new sql.Request(transaction);
@@ -1746,14 +1665,6 @@ router.post("/loanApplication/submitSignatureLegal", async (req, res) => {
                 legal_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         else {
             // No record, insert new
@@ -1765,14 +1676,6 @@ router.post("/loanApplication/submitSignatureLegal", async (req, res) => {
             INSERT INTO tbl_Signature (application_id, staff_id_legal, signature_legal)
             VALUES (@application_id, @staff_id_legal, @signature_legal)
           `);
-            const updateSignature = new sql.Request(transaction);
-            await updateSignature
-                .input("staff_id", sql.Int, data.staff_id)
-                .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
         }
         await transaction.commit();
         updateLoanStatus("Legal", "Approved", data.application_id);
@@ -2461,14 +2364,6 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
                 .status(500)
                 .json({ success: false, message: "Failed to insert status history" });
         }
-        const updateStatusLoan = await transaction
-            .request()
-            .input("status", sql.VarChar, "Approved")
-            .input("application_id", sql.Int, application_id).query(`
-                UPDATE tbl_Loan_Application
-                SET status = @status
-                WHERE application_id = @application_id;
-            `);
         // Commit transaction
         await transaction.commit();
         res

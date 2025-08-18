@@ -1605,15 +1605,6 @@ router.post(
                 accounting_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       } else {
         // No record, insert new
         const insertRequest = new sql.Request(transaction);
@@ -1624,15 +1615,6 @@ router.post(
             INSERT INTO tbl_Signature (application_id, staff_id_accounting, signature_accounting)
             VALUES (@application_id, @staff_id_accounting, @signature_accounting)
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       }
 
       await transaction.commit();
@@ -1772,15 +1754,6 @@ router.post(
                 hr_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       } else {
         // No record, insert new
         const insertRequest = new sql.Request(transaction);
@@ -1791,15 +1764,6 @@ router.post(
             INSERT INTO tbl_Signature (application_id, staff_id_hr, signature_hr)
             VALUES (@application_id, @staff_id_hr, @signature_hr)
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       }
 
       // Update loan status
@@ -1868,15 +1832,6 @@ router.post(
                 asds_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       } else {
         // No record, insert new
         const insertRequest = new sql.Request(transaction);
@@ -1887,15 +1842,6 @@ router.post(
             INSERT INTO tbl_Signature (application_id, staff_id_asds, signature_asds)
             VALUES (@application_id, @staff_id_asds, @signature_asds)
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       }
 
       // Update loan status
@@ -2046,15 +1992,6 @@ router.post(
                 admin_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       } else {
         // No record, insert new
         const insertRequest = new sql.Request(transaction);
@@ -2065,15 +2002,6 @@ router.post(
             INSERT INTO tbl_Signature (application_id, staff_id_admin, signature_admin)
             VALUES (@application_id, @staff_id_admin, @signature_admin)
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       }
 
       // Update loan status
@@ -2144,15 +2072,6 @@ router.post(
                 legal_date = GETDATE()
             WHERE signature_id = @signature_id
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       } else {
         // No record, insert new
         const insertRequest = new sql.Request(transaction);
@@ -2163,15 +2082,6 @@ router.post(
             INSERT INTO tbl_Signature (application_id, staff_id_legal, signature_legal)
             VALUES (@application_id, @staff_id_legal, @signature_legal)
           `);
-
-        const updateSignature = new sql.Request(transaction);
-        await updateSignature
-          .input("staff_id", sql.Int, data.staff_id)
-          .input("signature", sql.NVarChar, data.signature).query(`
-              UPDATE tbl_Staff
-              SET signature = @signature
-              WHERE staff_id = @staff_id
-              `);
       }
 
       await transaction.commit();
