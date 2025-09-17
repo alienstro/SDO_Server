@@ -26,10 +26,13 @@ router.get("/loanApplication/loanDetails", async (req, res) => {
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status
+                la.status,
+                lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
+                    JOIN tbl_Loan_Application lap
+                        ON la.application_id = lap.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = 6 AND la.application_id IN (
@@ -177,7 +180,7 @@ router.get("/loanApplication/getLoanDetailsSignature/:departmentId", async (req,
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status,
+                lap.status,
                 lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
@@ -231,10 +234,13 @@ router.get("/loanApplication/getLoanDetailsApproval/:departmentId", async (req, 
                 a.first_name,
                 a.middle_name,
                 la.department_id,
-                la.status
+                lap.status,
+                lap.remarks_message
                     FROM tbl_Department_Status la
                     JOIN tbl_Loan_Details ld
                         ON la.application_id = ld.application_id
+                    JOIN tbl_Loan_Application lap
+                        ON la.application_id = lap.application_id
                     JOIN tbl_Applicant a
                         ON ld.applicant_id = a.applicant_id
                     WHERE la.department_id = @departmentId AND la.application_id IN (
@@ -1164,6 +1170,44 @@ router.patch("/loanApplication/assessLoanApplication/:application_id", async (re
             .json({ message: "Failed to update loan assessment", error });
     }
 });
+// PATCH METHOD: Change the co-maker email in the co_makers_information table
+router.patch("/loanApplication/changeCoMakerEmail/:application_id", async (req, res) => {
+    const { email } = req.body;
+    const application_id = parseInt(req.params.application_id);
+    try {
+        const pool = await connectToDatabase();
+        const update = await pool
+            .request()
+            .input("co_email", sql.VarChar(255), email)
+            .input("application_id", sql.Int, application_id).query(`
+          UPDATE tbl_Co_Makers_Information
+          SET co_email = @co_email
+          WHERE application_id = @application_id
+        `);
+        if (update.rowsAffected[0] > 0) {
+            return res
+                .status(200)
+                .json({
+                success: true,
+                message: "Co-maker email updated successfully.",
+            });
+        }
+        else {
+            return res
+                .status(500)
+                .json({
+                success: false,
+                message: "Failed to update co-maker email.",
+            });
+        }
+    }
+    catch (error) {
+        console.error("changeCoMakerEmail error:", error);
+        return res
+            .status(500)
+            .json({ success: false, message: "Server error", error });
+    }
+});
 // POST METHOD: Assess Loan Application FOR ADMIN
 router.post("/loanApplication/assessLoanApplicationAdmin", async (req, res) => {
     var _a;
@@ -1318,13 +1362,28 @@ router.post("/loanApplication/submitSignatureAccounting", async (req, res) => {
     }
 });
 // POST METHOD: Reject Admin Application
-router.post("/loanApplication/rejectAdmin", async (req, res) => {
+router.post("/loanApplication/rejectApplicationOffice", async (req, res) => {
     const data = req.body;
     try {
         // Update department status
-        await updateLoanStatus("Admin", "Rejected", data.application_id);
-        await updateLoanStatus("HR", "Rejected", data.application_id);
-        await updateLoanStatus("Legal", "Rejected", data.application_id);
+        if (data.office === "Admin") {
+            await updateLoanStatus("Admin", "Rejected", data.application_id);
+        }
+        else if (data.office === "HR") {
+            await updateLoanStatus("HR", "Rejected", data.application_id);
+        }
+        else if (data.office === "Legal") {
+            await updateLoanStatus("Legal", "Rejected", data.application_id);
+        }
+        else if (data.office === "ASDS") {
+            await updateLoanStatus("ASDS", "Rejected", data.application_id);
+        }
+        else if (data.office === "OSDS") {
+            await updateLoanStatus("OSDS", "Rejected", data.application_id);
+        }
+        else {
+            res.status(500).json({ message: "Unkown Department Office" });
+        }
         // Update main loan application status to 'Rejected'
         const pool = await connectToDatabase();
         await pool
@@ -2390,6 +2449,14 @@ router.patch("/loanApplication/updateApprovalOSDS", async (req, res) => {
                 .status(500)
                 .json({ success: false, message: "Failed to insert status history" });
         }
+        const updateStatusLoan = await transaction
+            .request()
+            .input("status", sql.VarChar, "Approved")
+            .input("application_id", sql.Int, application_id).query(`
+                UPDATE tbl_Loan_Application
+                SET status = @status
+                WHERE application_id = @application_id;
+            `);
         // Commit transaction
         await transaction.commit();
         res

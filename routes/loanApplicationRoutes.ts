@@ -1411,6 +1411,49 @@ router.patch(
   }
 );
 
+// PATCH METHOD: Change the co-maker email in the co_makers_information table
+router.patch(
+  "/loanApplication/changeCoMakerEmail/:application_id",
+  async (req: Request, res: Response): Promise<any> => {
+    const { email } = req.body;
+    const application_id = parseInt(req.params.application_id);
+
+    try {
+      const pool = await connectToDatabase();
+
+      const update = await pool
+        .request()
+        .input("co_email", sql.VarChar(255), email)
+        .input("application_id", sql.Int, application_id).query(`
+          UPDATE tbl_Co_Makers_Information
+          SET co_email = @co_email
+          WHERE application_id = @application_id
+        `);
+
+      if (update.rowsAffected[0] > 0) {
+        return res
+          .status(200)
+          .json({
+            success: true,
+            message: "Co-maker email updated successfully.",
+          });
+      } else {
+        return res
+          .status(500)
+          .json({
+            success: false,
+            message: "Failed to update co-maker email.",
+          });
+      }
+    } catch (error) {
+      console.error("changeCoMakerEmail error:", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Server error", error });
+    }
+  }
+);
+
 // POST METHOD: Assess Loan Application FOR ADMIN
 router.post(
   "/loanApplication/assessLoanApplicationAdmin",
@@ -1645,15 +1688,15 @@ router.post(
 
     try {
       // Update department status
-      if (data.office === 'Admin') {
+      if (data.office === "Admin") {
         await updateLoanStatus("Admin", "Rejected", data.application_id);
-      } else if (data.office === 'HR') {
+      } else if (data.office === "HR") {
         await updateLoanStatus("HR", "Rejected", data.application_id);
-      } else if (data.office === 'Legal') {
+      } else if (data.office === "Legal") {
         await updateLoanStatus("Legal", "Rejected", data.application_id);
-      } else if (data.office === 'ASDS') {
+      } else if (data.office === "ASDS") {
         await updateLoanStatus("ASDS", "Rejected", data.application_id);
-      } else if (data.office === 'OSDS') {
+      } else if (data.office === "OSDS") {
         await updateLoanStatus("OSDS", "Rejected", data.application_id);
       } else {
         res.status(500).json({ message: "Unkown Department Office" });
@@ -1690,7 +1733,6 @@ router.post(
     const data = req.body;
 
     try {
-
       // Update main loan application status to 'Rejected'
       const pool = await connectToDatabase();
       await pool
