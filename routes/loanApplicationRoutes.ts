@@ -347,7 +347,8 @@ router.get(
             a.first_name,
             a.middle_name,
             a.designation,
-            la.is_approved_osds
+            la.is_approved_osds,
+            la.status
           FROM tbl_Loan_Application la
           JOIN tbl_Loan_Details ld ON la.application_id = ld.application_id
           JOIN tbl_Applicant a ON la.applicant_id = a.applicant_id
@@ -1744,6 +1745,8 @@ router.post(
         await updateLoanStatus("Legal", "Rejected", data.application_id);
       } else if (data.office === "ASDS") {
         await updateLoanStatus("ASDS", "Rejected", data.application_id);
+      } else if (data.office === "SDS") {
+        await updateLoanStatus("SDS", "Rejected", data.application_id);
       } else if (data.office === "OSDS") {
         await updateLoanStatus("OSDS", "Rejected", data.application_id);
       } else {
