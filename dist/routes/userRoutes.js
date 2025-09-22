@@ -217,7 +217,7 @@ router.get("/applicantUser", async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve users", error });
     }
 });
-// GET METHOD: Fetch Staffs
+// GET METHOD: Fetch specific staff
 router.get("/staffUser/:staff_id", async (req, res) => {
     const { staff_id } = req.params;
     try {
@@ -234,7 +234,42 @@ router.get("/staffUser/:staff_id", async (req, res) => {
           designation,
           email,
           department_id,
-          emp_status
+          emp_status,
+          signature
+        FROM [sdo_accounting].[dbo].[tbl_Staff]
+        WHERE staff_id = @staff_id
+      `);
+        if (result.recordset.length > 0) {
+            res.status(200).json(result.recordset);
+        }
+        else {
+            res.status(404).json({ message: "No staff found" });
+        }
+    }
+    catch (error) {
+        console.error("Failed to retrieve staff:", error);
+        res.status(500).json({ message: "Failed to retrieve staff", error });
+    }
+});
+// GET METHOD: Fetch Staffs except staff id
+router.get("/staffUserExcept/:staff_id", async (req, res) => {
+    const { staff_id } = req.params;
+    try {
+        const pool = await connectToDatabase();
+        const result = await pool
+            .request()
+            .input("staff_id", sql.Int, Number(staff_id)).query(`
+        SELECT  
+          staff_id,
+          first_name,
+          middle_name,
+          last_name,
+          ext_name,
+          designation,
+          email,
+          department_id,
+          emp_status,
+          signature
         FROM [sdo_accounting].[dbo].[tbl_Staff]
         WHERE staff_id <> @staff_id
       `);
